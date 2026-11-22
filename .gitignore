@@ -1,8 +1,5 @@
 .env
 data/
-archive/*/data/media/*
-!archive/*/data/media/.gitkeep
-archive/*/config/manual_trends.json
 __pycache__/
 *.pyc
 .venv/
