@@ -1,0 +1,156 @@
+{
+  "id": "cortesDiscordIn01",
+  "name": "Studio — entrada do Discord",
+  "nodes": [
+    {
+      "id": "a1",
+      "name": "Discord (via bot)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 300],
+      "webhookId": "3b8f7c2a-1d4e-4f6a-9b2c-5e7d8a9f0c11",
+      "parameters": { "httpMethod": "POST", "path": "discord-in", "responseMode": "lastNode", "options": {} }
+    },
+    {
+      "id": "a0",
+      "name": "Módulo",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [220, 300],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+                "conditions": [
+                  { "id": "m1", "leftValue": "={{ $json.body.module }}", "rightValue": "cortes",
+                    "operator": { "type": "string", "operation": "equals" } }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true, "outputKey": "cortes"
+            }
+          ]
+        },
+        "options": { "fallbackOutput": "extra", "renameFallbackOutput": "outro" }
+      }
+    },
+    {
+      "id": "a2",
+      "name": "Cortes: tipo de pedido",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [460, 200],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+                "conditions": [
+                  { "id": "c1", "leftValue": "={{ $json.body.type }}", "rightValue": "new_request",
+                    "operator": { "type": "string", "operation": "equals" } }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true, "outputKey": "novo corte"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+                "conditions": [
+                  { "id": "c2", "leftValue": "={{ $json.body.type }}", "rightValue": "action",
+                    "operator": { "type": "string", "operation": "equals" } }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true, "outputKey": "ação num corte"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a3",
+      "name": "Cortes: criar corte",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [720, 100],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CORTES_URL }}/jobs",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "Authorization", "value": "=Bearer {{ $env.WORKER_TOKEN }}" } ] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ url: $json.body.url, instructions: $json.body.instructions || null, auto_approve: false, context: { discord: $json.body.discord } }) }}",
+        "options": { "response": { "response": { "fullResponse": true, "neverError": true } } }
+      }
+    },
+    {
+      "id": "a4",
+      "name": "Cortes: ação no corte",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [720, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.CORTES_URL }}/jobs/{{ $json.body.job_id }}/{{ $json.body.action }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "Authorization", "value": "=Bearer {{ $env.WORKER_TOKEN }}" } ] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ text: $json.body.text || '' }) }}",
+        "options": { "response": { "response": { "fullResponse": true, "neverError": true } } }
+      }
+    },
+    {
+      "id": "a5",
+      "name": "Resposta: corte criado",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [980, 100],
+      "parameters": {
+        "jsCode": "const r = $input.first().json;\nif (r.statusCode >= 300) {\n  return [{ json: { message: `⚠️ Não consegui criar o corte: ${JSON.stringify(r.body?.detail ?? r.body)}` } }];\n}\nreturn [{ json: { message: `🎬 Corte #${r.body.id} na fila. Te aviso aqui quando o roteiro estiver pronto.` } }];"
+      }
+    },
+    {
+      "id": "a6",
+      "name": "Resposta: ação",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [980, 300],
+      "parameters": {
+        "jsCode": "const r = $input.first().json;\nconst req = $('Discord (via bot)').first().json.body;\nconst nomes = { approve: '✅ Aprovado! Renderizando o vídeo...', replan: '🔁 Refazendo o roteiro...', revise: '✏️ Aplicando as alterações...', cancel: '🛑 Cancelado.', retry: '🔄 Tentando de novo...' };\nif (r.statusCode >= 300) {\n  return [{ json: { message: `⚠️ Corte #${req.job_id}: ${r.body?.detail ?? 'erro ' + r.statusCode}` } }];\n}\nreturn [{ json: { message: `${nomes[req.action] ?? 'ok'} (corte #${req.job_id})` } }];"
+      }
+    },
+    {
+      "id": "a7",
+      "name": "Resposta: módulo desconhecido",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 460],
+      "parameters": {
+        "jsCode": "const req = $input.first().json.body;\nreturn [{ json: { message: `⚠️ Módulo desconhecido: ${req.module ?? '(vazio)'}` } }];"
+      }
+    }
+  ],
+  "connections": {
+    "Discord (via bot)": { "main": [ [ { "node": "Módulo", "type": "main", "index": 0 } ] ] },
+    "Módulo": { "main": [
+      [ { "node": "Cortes: tipo de pedido", "type": "main", "index": 0 } ],
+      [ { "node": "Resposta: módulo desconhecido", "type": "main", "index": 0 } ]
+    ] },
+    "Cortes: tipo de pedido": { "main": [
+      [ { "node": "Cortes: criar corte", "type": "main", "index": 0 } ],
+      [ { "node": "Cortes: ação no corte", "type": "main", "index": 0 } ]
+    ] },
+    "Cortes: criar corte": { "main": [ [ { "node": "Resposta: corte criado", "type": "main", "index": 0 } ] ] },
+    "Cortes: ação no corte": { "main": [ [ { "node": "Resposta: ação", "type": "main", "index": 0 } ] ] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {},
+  "active": false
+}
