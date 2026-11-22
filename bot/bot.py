@@ -1,14 +1,15 @@
-"""Bot do Discord do Astroverso Studio: só entrada e saída. A lógica fica no n8n; o trabalho, nos módulos.
+"""Ponte do Astroverso Studio com o Discord. O bot em si é o astroverso-discord (o `astro`), compartilhado com
+outros projetos; esta ponte é o cliente `studio` dele. A lógica fica no n8n; o trabalho, nos módulos.
 
-Entrada (Discord → n8n, POST {N8N_WEBHOOK_BASE}/discord-in):
+Entrada (astroverso-discord → ponte → n8n, POST {N8N_WEBHOOK_BASE}/discord-in):
   - mensagem no canal com um link          → {"type": "new_request", "module": STUDIO_DEFAULT_MODULE, "url", "instructions"}
   - resposta (reply) a uma mensagem de job → {"type": "action", "module", "action": "revise"|"replan", "job_id", "text"}
   - botões                                 → {"type": "action", "module", "action", "job_id", "text"}
-  O n8n responde {"message": "..."}; o bot repassa ao usuário.
+  O n8n responde {"message": "..."}; a ponte devolve ao astroverso-discord, que responde no canal.
 
-Saída (n8n → Discord, POST http://bot:8000/send, Authorization: Bearer BOT_API_TOKEN):
+Saída (n8n → ponte → astroverso-discord, POST http://bot:8000/send, Authorization: Bearer BOT_API_TOKEN):
   {"channel_id"?, "reply_to"?, "content"?, "embed"?: {"title","description","color","footer","url"},
-   "file_path"?: "<módulo>/...", "buttons"?: [{"label","custom_id","style"}]}
+   "file_path"?: "<módulo>/...", "file_name"?, "buttons"?: [{"label","custom_id","style"}]}
 
 Convenções para os módulos:
   - custom_id dos botões: "<módulo>:<ação>:<id>" (ex.: "cortes:approve:12")
@@ -17,41 +18,46 @@ Convenções para os módulos:
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import re
 from pathlib import Path
 
 import aiohttp
-import discord
 from aiohttp import web
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s bot: %(message)s")
 log = logging.getLogger("bot")
 
-TOKEN = os.environ["DISCORD_BOT_TOKEN"]
-CHANNEL_ID = int(os.environ["DISCORD_CHANNEL_ID"])
-ALLOWED = {int(x) for x in os.environ.get("DISCORD_ALLOWED_USER_IDS", "").replace(" ", "").split(",") if x}
+DISCORD = os.environ["ASTROVERSO_DISCORD_URL"].rstrip("/")
+DISCORD_KEY = os.environ["ASTROVERSO_DISCORD_KEY"]
+CHANNEL = os.environ.get("STUDIO_DISCORD_CHANNEL", "studio")
 DEFAULT_MODULE = os.environ.get("STUDIO_DEFAULT_MODULE", "cortes")
 N8N = os.environ.get("N8N_WEBHOOK_BASE", "http://n8n:5678/webhook").rstrip("/")
 API_TOKEN = os.environ["BOT_API_TOKEN"]
 MEDIA = Path(os.environ.get("MEDIA_DIR", "/data"))
+PUBLISH_EVERY = 300
 
 URL_RE = re.compile(r"https?://\S+")
 REF_RE = re.compile(r"\b([A-Za-z][A-Za-z0-9_-]*) #(\d+)")
 # nomes antigos (mensagens já postadas antes dos módulos)
 ALIASES = {"cut": "cortes", "corte": "cortes"}
-STYLES = {"primary": discord.ButtonStyle.primary, "success": discord.ButtonStyle.success,
-          "danger": discord.ButtonStyle.danger, "secondary": discord.ButtonStyle.secondary}
-ACTION_LABEL = {"replan": "Refazer o roteiro", "revise": "Pedir alteração"}
+STYLES = {"primary", "success", "danger", "secondary"}
+# o que o studio declara ao astroverso-discord: o canal que ele escuta e os botões que são dele
+# (Refazer e Pedir alteração abrem uma caixa de texto antes de virar evento)
+MANIFEST = {
+    "canais": [{"nome": CHANNEL, "escrita": True, "escuta": True}],
+    "botoes": [{
+        "padrao": r"^[A-Za-z][A-Za-z0-9_-]*:[a-z_]+:\d+$",
+        "texto": {"padrao": r"^[A-Za-z][A-Za-z0-9_-]*:(replan|revise):\d+$", "titulo": "Pedido ao studio",
+                  "rotulo": "O que você quer?",
+                  "dica": "ex.: começa uma frase antes, tira a parte do patrocínio, legenda maior..."},
+    }],
+}
 
-intents = discord.Intents.default()
-intents.message_content = True  # precisa estar ligado no Developer Portal
-client = discord.Client(intents=intents)
-
-
-def allowed(user: discord.abc.User) -> bool:
-    return not ALLOWED or user.id in ALLOWED
+state = {"channel_id": None, "connected": False}
+session: aiohttp.ClientSession | None = None
 
 
 def module_name(name: str) -> str:
@@ -59,172 +65,203 @@ def module_name(name: str) -> str:
     return ALIASES.get(name, name)
 
 
+async def discord_call(method: str, path: str, **kwargs) -> dict:
+    """Chama a API do astroverso-discord com a chave do cliente studio."""
+    async with session.request(method, f"{DISCORD}{path}", headers={"Authorization": f"Bearer {DISCORD_KEY}"},
+                               **kwargs) as r:
+        raw = await r.text()
+        if r.status >= 300:
+            raise RuntimeError(f"astroverso-discord respondeu {r.status}: {raw[:200]}")
+        return json.loads(raw) if raw else {}
+
+
 async def to_n8n(payload: dict) -> str:
     """Envia ao n8n e devolve a mensagem de resposta (ou um erro legível)."""
     try:
-        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=60)) as s:
-            async with s.post(f"{N8N}/discord-in", json=payload) as r:
-                if r.status >= 300:
-                    return f"⚠️ n8n respondeu {r.status}"
-                try:
-                    data = await r.json(content_type=None)
-                except Exception:  # noqa: BLE001
-                    return "✅ recebido"
-                if isinstance(data, list):
-                    data = data[0] if data else {}
-                return str(data.get("message") or "✅ recebido")
+        async with session.post(f"{N8N}/discord-in", json=payload, timeout=aiohttp.ClientTimeout(total=60)) as r:
+            if r.status >= 300:
+                return f"⚠️ n8n respondeu {r.status}"
+            try:
+                data = await r.json(content_type=None)
+            except Exception:  # noqa: BLE001
+                return "✅ recebido"
+            if isinstance(data, list):
+                data = data[0] if data else {}
+            return str(data.get("message") or "✅ recebido")
     except Exception as e:  # noqa: BLE001
         log.exception("falha ao falar com o n8n")
         return f"⚠️ não consegui falar com o n8n ({type(e).__name__})"
 
 
-def job_ref(msg: discord.Message) -> tuple[str, int] | None:
+def job_ref(ref: dict) -> tuple[str, int] | None:
     """(módulo, id) de uma mensagem do bot, pelo rodapé "<módulo> #<id>"."""
     texts = []
-    for e in msg.embeds:
-        texts += [e.footer.text if e.footer else "", e.title or ""]
-    texts.append(msg.content or "")
+    for q in ref.get("quadros") or []:
+        texts += [q.get("rodape") or "", q.get("titulo") or ""]
+    texts.append(ref.get("texto") or "")
     for t in texts:
         if (m := REF_RE.search(t)):
             return module_name(m.group(1)), int(m.group(2))
     return None
 
 
+async def answer(event_id: str, text: str) -> None:
+    await discord_call("POST", f"/v1/eventos/{event_id}/resposta", json={"texto": text[:2000]})
+
+
+async def react(event: dict, emoji: str) -> None:
+    try:
+        await discord_call("POST", "/v1/reacoes",
+                           json={"canal_id": event["canal_id"], "mensagem_id": event["mensagem_id"], "emoji": emoji})
+    except Exception as e:  # noqa: BLE001
+        log.warning("reação recusada: %s", e)
+
+
 # ---------------------------------------------------------------- entrada
-@client.event
-async def on_ready():
-    log.info("conectado como %s; canal %s; módulo padrão %s", client.user, CHANNEL_ID, DEFAULT_MODULE)
-
-
-@client.event
-async def on_message(msg: discord.Message):
-    if msg.author.bot or msg.channel.id != CHANNEL_ID or not allowed(msg.author):
-        return
-    ctx = {"channel_id": str(msg.channel.id), "message_id": str(msg.id),
-           "user_id": str(msg.author.id), "user": msg.author.display_name}
+async def on_message(event: dict) -> None:
+    user = event.get("usuario") or {}
+    ctx = {"channel_id": event.get("canal_id"), "message_id": event.get("mensagem_id"),
+           "user_id": user.get("id"), "user": user.get("exibicao") or user.get("nome")}
+    text = event.get("texto") or ""
 
     # resposta a uma mensagem do bot sobre um job → pedido de alteração
-    if msg.reference and msg.reference.message_id:
-        try:
-            ref = msg.reference.resolved or await msg.channel.fetch_message(msg.reference.message_id)
-        except discord.HTTPException:
-            ref = None
-        if isinstance(ref, discord.Message) and ref.author == client.user and (r := job_ref(ref)):
-            module, jid = r
-            action = "revise" if ref.attachments else "replan"
-            await msg.add_reaction("🔁")
-            reply = await to_n8n({"type": "action", "module": module, "action": action, "job_id": jid,
-                                  "text": msg.content, "discord": ctx})
-            await msg.reply(reply, mention_author=False)
-            return
+    ref = event.get("responde_a")
+    if ref and ref.get("do_bot") and (r := job_ref(ref)):
+        module, jid = r
+        action = "revise" if ref.get("anexos") else "replan"
+        await react(event, "🔁")
+        reply = await to_n8n({"type": "action", "module": module, "action": action, "job_id": jid,
+                              "text": text, "discord": ctx})
+        await answer(event["id"], reply)
+        return
 
-    m = URL_RE.search(msg.content or "")
+    m = URL_RE.search(text)
     if not m:
         return
     url = m.group(0).rstrip(">)")
-    instructions = (msg.content[:m.start()] + msg.content[m.end():]).strip()
-    await msg.add_reaction("👀")
+    instructions = (text[:m.start()] + text[m.end():]).strip()
+    await react(event, "👀")
     reply = await to_n8n({"type": "new_request", "module": DEFAULT_MODULE, "url": url,
                           "instructions": instructions, "discord": ctx})
-    await msg.reply(reply, mention_author=False)
+    await answer(event["id"], reply)
 
 
-class TextModal(discord.ui.Modal):
-    def __init__(self, module: str, action: str, job_id: int):
-        super().__init__(title=f"{ACTION_LABEL[action]} — {module} #{job_id}"[:45])
-        self.module, self.action, self.job_id = module, action, job_id
-        self.text = discord.ui.TextInput(
-            label="O que você quer?", style=discord.TextStyle.paragraph, max_length=1500,
-            placeholder="ex.: começa uma frase antes, tira a parte do patrocínio, legenda maior...")
-        self.add_item(self.text)
-
-    async def on_submit(self, interaction: discord.Interaction):
-        await interaction.response.defer(thinking=True)
-        reply = await to_n8n({"type": "action", "module": self.module, "action": self.action,
-                              "job_id": self.job_id, "text": str(self.text.value), "discord": _ictx(interaction)})
-        await interaction.followup.send(f"{interaction.user.mention}: {self.text.value}\n{reply}")
-
-
-def _ictx(i: discord.Interaction) -> dict:
-    return {"channel_id": str(i.channel_id), "user_id": str(i.user.id), "user": i.user.display_name,
-            "message_id": str(i.message.id) if i.message else None}
-
-
-@client.event
-async def on_interaction(interaction: discord.Interaction):
-    if interaction.type != discord.InteractionType.component:
-        return
-    parts = ((interaction.data or {}).get("custom_id") or "").split(":")
+async def on_button(event: dict) -> None:
+    parts = (event.get("custom_id") or "").split(":")
     if len(parts) != 3 or not parts[2].isdigit():
-        return  # botões de outros bots/projetos (ex.: "astro|...") passam direto
-    if not allowed(interaction.user):
-        await interaction.response.send_message("sem permissão", ephemeral=True)
         return
+    user = event.get("usuario") or {}
+    ctx = {"channel_id": event.get("canal_id"), "user_id": user.get("id"),
+           "user": user.get("exibicao") or user.get("nome"), "message_id": event.get("mensagem_id")}
     module, action, jid = module_name(parts[0]), parts[1], int(parts[2])
-    if action in ACTION_LABEL:
-        await interaction.response.send_modal(TextModal(module, action, jid))
-        return
-    await interaction.response.defer(thinking=True)
-    reply = await to_n8n({"type": "action", "module": module, "action": action, "job_id": jid, "text": "",
-                          "discord": _ictx(interaction)})
-    await interaction.followup.send(f"{interaction.user.mention}: {reply}")
+    text = event.get("texto") or ""
+    reply = await to_n8n({"type": "action", "module": module, "action": action, "job_id": jid, "text": text,
+                          "discord": ctx})
+    mention = f"<@{user.get('id')}>"
+    await answer(event["id"], f"{mention}: {text}\n{reply}" if text else f"{mention}: {reply}")
+
+
+async def handle(event: dict) -> None:
+    try:
+        if event.get("tipo") == "mensagem":
+            await on_message(event)
+        elif event.get("tipo") == "botao":
+            await on_button(event)
+    except Exception:  # noqa: BLE001
+        log.exception("falha ao tratar o evento %s", event.get("id"))
+
+
+async def publish() -> None:
+    data = await discord_call("PUT", "/v1/cliente", json=MANIFEST)
+    state["channel_id"] = (data.get("canais") or {}).get(CHANNEL)
+    state["connected"] = True
+    log.info("conectado ao astroverso-discord em %s; canal #%s (%s); módulo padrão %s",
+             DISCORD, CHANNEL, state["channel_id"] or "sem permissão para criar", DEFAULT_MODULE)
+
+
+async def events_loop() -> None:
+    """Busca os eventos do cliente studio (espera de até 25s) e republica o manifesto a cada 5 min."""
+    loop = asyncio.get_running_loop()
+    last = None
+    while True:
+        try:
+            if last is None or loop.time() - last >= PUBLISH_EVERY:
+                await publish()
+                last = loop.time()
+            data = await discord_call("GET", "/v1/eventos?espera=25", timeout=aiohttp.ClientTimeout(total=40))
+            state["connected"] = True
+            for event in data.get("eventos") or []:
+                asyncio.create_task(handle(event))
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:  # noqa: BLE001
+            if state["connected"] or last is None:
+                log.warning("sem conexão com o astroverso-discord (%s): tento de novo a cada 10s", e)
+            state["connected"] = False
+            last = None
+            await asyncio.sleep(10)
 
 
 # ---------------------------------------------------------------- saída (API para o n8n)
-def _view(buttons: list[dict]) -> discord.ui.View | None:
-    if not buttons:
-        return None
-    v = discord.ui.View(timeout=None)
-    for b in buttons[:5]:
-        v.add_item(discord.ui.Button(label=b["label"][:80], custom_id=b["custom_id"],
-                                     style=STYLES.get(b.get("style", "secondary"), discord.ButtonStyle.secondary)))
-    return v
+def translate(body: dict) -> dict:
+    """Formato do n8n (/send) → formato do astroverso-discord (/v1/mensagens)."""
+    out: dict = {"texto": (body.get("content") or "")[:2000]}
+    if body.get("channel_id"):
+        out["canal_id"] = str(body["channel_id"])
+    else:
+        out["canal"] = CHANNEL
+    if body.get("reply_to"):
+        out["responde_a"] = str(body["reply_to"])
+    if (e := body.get("embed")):
+        out["quadro"] = {"titulo": e.get("title"), "descricao": e.get("description"),
+                         "cor": int(e.get("color", 0x5865F2)), "rodape": e.get("footer"), "url": e.get("url")}
+    if (buttons := body.get("buttons")):
+        out["botoes"] = [{"rotulo": b["label"], "custom_id": b["custom_id"],
+                          "estilo": b.get("style") if b.get("style") in STYLES else "secondary"} for b in buttons[:5]]
+    return out
 
 
 async def api_send(request: web.Request) -> web.Response:
     if request.headers.get("Authorization") != f"Bearer {API_TOKEN}":
         return web.json_response({"error": "unauthorized"}, status=401)
     body = await request.json()
-    channel = client.get_channel(int(body.get("channel_id") or CHANNEL_ID)) or \
-        await client.fetch_channel(int(body.get("channel_id") or CHANNEL_ID))
-    kwargs: dict = {"content": (body.get("content") or None) and body["content"][:2000]}
-    if (e := body.get("embed")):
-        emb = discord.Embed(title=(e.get("title") or "")[:256] or None, description=(e.get("description") or "")[:4000],
-                            color=int(e.get("color", 0x5865F2)), url=e.get("url") or None)
-        if e.get("footer"):
-            emb.set_footer(text=e["footer"][:2048])
-        kwargs["embed"] = emb
-    if (fp := body.get("file_path")):
-        path = (MEDIA / fp).resolve()
-        if MEDIA.resolve() not in path.parents or not path.exists():
-            return web.json_response({"error": f"arquivo inválido: {fp}"}, status=400)
-        kwargs["file"] = discord.File(path, filename=body.get("file_name") or path.name)
-    if (v := _view(body.get("buttons") or [])):
-        kwargs["view"] = v
-    if body.get("reply_to"):
-        try:
-            ref = await channel.fetch_message(int(body["reply_to"]))
-            msg = await ref.reply(mention_author=False, **kwargs)
-        except discord.HTTPException:
-            msg = await channel.send(**kwargs)
-    else:
-        msg = await channel.send(**kwargs)
-    return web.json_response({"message_id": str(msg.id)})
+    message = translate(body)
+    try:
+        if (fp := body.get("file_path")):
+            path = (MEDIA / fp).resolve()
+            if MEDIA.resolve() not in path.parents or not path.exists():
+                return web.json_response({"error": f"arquivo inválido: {fp}"}, status=400)
+            message["arquivo_nome"] = body.get("file_name") or path.name
+            with path.open("rb") as f:
+                form = aiohttp.FormData()
+                form.add_field("dados", json.dumps(message, ensure_ascii=False), content_type="application/json")
+                form.add_field("arquivo", f, filename=message["arquivo_nome"])
+                data = await discord_call("POST", "/v1/mensagens", data=form)
+        else:
+            data = await discord_call("POST", "/v1/mensagens", json=message)
+    except Exception as e:  # noqa: BLE001
+        log.warning("mensagem não enviada: %s", e)
+        return web.json_response({"error": str(e)}, status=502)
+    return web.json_response({"message_id": data.get("mensagem_id")})
 
 
 async def api_health(_: web.Request) -> web.Response:
-    return web.json_response({"ok": client.is_ready()})
+    return web.json_response({"ok": state["connected"]})
 
 
 async def main():
+    global session
+    session = aiohttp.ClientSession()
     app = web.Application(client_max_size=2 * 1024 * 1024)
     app.add_routes([web.post("/send", api_send), web.get("/health", api_health)])
     runner = web.AppRunner(app)
     await runner.setup()
     await web.TCPSite(runner, "0.0.0.0", 8000).start()
-    log.info("API do bot em :8000")
-    async with client:
-        await client.start(TOKEN)
+    log.info("API da ponte em :8000")
+    try:
+        await events_loop()
+    finally:
+        await session.close()
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 # Astroverso Studio
-# Base compartilhada (postgres, n8n, bot) + um serviço por módulo (modules/<módulo>).
+# Base compartilhada (postgres, n8n, ponte com o Discord) + um serviço por módulo (modules/<módulo>).
 # Rodar no Linux/WSL:  podman-compose up -d --build
 
 name: astroverso-studio
@@ -50,9 +50,10 @@ services:
     build: ./bot
     restart: unless-stopped
     environment:
-      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN}
-      DISCORD_CHANNEL_ID: ${DISCORD_CHANNEL_ID}
-      DISCORD_ALLOWED_USER_IDS: ${DISCORD_ALLOWED_USER_IDS:-}
+      # o bot do Discord é o astroverso-discord; esta é a ponte do cliente studio
+      ASTROVERSO_DISCORD_URL: ${ASTROVERSO_DISCORD_URL}
+      ASTROVERSO_DISCORD_KEY: ${ASTROVERSO_DISCORD_KEY}
+      STUDIO_DISCORD_CHANNEL: ${STUDIO_DISCORD_CHANNEL:-studio}
       # módulo que recebe as mensagens com link no canal
       STUDIO_DEFAULT_MODULE: ${STUDIO_DEFAULT_MODULE:-cortes}
       N8N_WEBHOOK_BASE: http://n8n:5678/webhook

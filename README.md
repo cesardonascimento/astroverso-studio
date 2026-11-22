@@ -5,7 +5,7 @@ criação é um **módulo**. Tokens e IDs não ficam no código: vão no `.env`.
 
 | Peça | Para que serve |
 |---|---|
-| [**bot**](bot/) | **O balcão de pedidos.** Em vez de terminal, você pede e aprova pelo Discord, inclusive pelo celular. O bot só leva e traz mensagens: recebe links, cliques e respostas e posta roteiros, vídeos e avisos. Só as contas autorizadas conseguem usar. |
+| [**bot**](bot/) | **O balcão de pedidos.** Em vez de terminal, você pede e aprova pelo Discord, inclusive pelo celular. O bot do Discord é o **astroverso-discord** (o `astro`), compartilhado com os outros projetos do Astroverso; aqui fica só a ponte, que leva e traz mensagens: recebe links, cliques e respostas e posta roteiros, vídeos e avisos. Só as contas autorizadas no astroverso-discord conseguem usar. |
 | [**n8n**](n8n/) | **O fluxo, editável sem programar.** "Quando chegar um pedido, mande ao módulo certo; quando ficar pronto, poste no canal." Essas regras ficam em blocos visuais que você muda pelo navegador, sem mexer no código dos módulos. |
 | **postgres** | **A memória.** Um banco por módulo, com cada pedido, suas versões e quanto cada chamada à IA custou. |
 | [**módulos**](modules/) | **As linhas de produção.** Cada módulo faz um tipo de mídia, do pedido ao arquivo final, e roda no seu próprio container. |
@@ -44,11 +44,13 @@ sh scripts/n8n-deploy.sh          # importa e publica os fluxos no n8n
 
 ### Base
 
-- **`DISCORD_BOT_TOKEN`:** o token do bot. No Discord Developer Portal → sua aplicação → Bot → Reset Token.
-- **`DISCORD_CHANNEL_ID`:** o canal do studio. O bot ignora os outros canais. Para copiar o ID, ligue o Modo
-  Desenvolvedor do Discord e clique com o botão direito no canal.
-- **`DISCORD_ALLOWED_USER_IDS`:** quem pode usar o studio, IDs separados por vírgula. Vazio libera para todos que
-  escrevem no canal. Recomendado: só o seu.
+- **`ASTROVERSO_DISCORD_URL`:** o endereço do astroverso-discord (ex.: `https://discord.<seu-domínio>`). A máquina
+  do studio precisa resolver esse nome para o servidor do bot (o AdGuard do homelab faz isso para a rede toda; no
+  WSL, confira se o DNS do Windows é o AdGuard).
+- **`ASTROVERSO_DISCORD_KEY`:** a chave do cliente `studio`. No assistente do astroverso-discord: **Mostrar a chave
+  de um cliente → studio**.
+- **`STUDIO_DISCORD_CHANNEL`:** o nome do canal do studio. O bot o cria na categoria do canal principal se ele não
+  existir. Padrão: `studio`. Quem pode usar o canal é definido no astroverso-discord (usuários autorizados).
 - **`STUDIO_DEFAULT_MODULE`:** o módulo que recebe as mensagens com link. Padrão: `cortes`.
 - **`TZ`:** fuso dos agendamentos e logs, no formato `<região>/<cidade>`. Padrão: `UTC`.
 
@@ -69,17 +71,15 @@ As variáveis de cada módulo estão no README dele.
 
 ## Depois de instalar
 
-- **Discord Developer Portal → Bot:** ligue **Message Content Intent**. Sem ele, o bot não lê o link das
-  mensagens e não conecta.
-- **Convite do bot:** o bot precisa ver o canal, enviar mensagens, anexar arquivos, adicionar reações e ler o
-  histórico.
+- **astroverso-discord:** precisa estar instalado, com o cliente `studio` e o **Message Content Intent** ligado (o
+  assistente dele avisa). Ao subir, a ponte cria (ou encontra) o canal do studio.
 - **n8n:** no primeiro acesso a `http://localhost:5678`, crie a conta de administrador.
 
 ## Comandos úteis
 
 ```bash
 podman-compose ps                        # estado dos serviços
-podman logs -f astroverso-studio_bot_1   # o bot
+podman logs -f astroverso-studio_bot_1   # a ponte com o Discord
 sh scripts/n8n-deploy.sh                 # reaplica os fluxos de n8n/workflows
 STUDIO_DB=cortes sh scripts/psql.sh      # banco de um módulo
 ```
@@ -87,7 +87,7 @@ STUDIO_DB=cortes sh scripts/psql.sh      # banco de um módulo
 ## Estrutura
 
 ```
-bot/              ponte com o Discord (compartilhada)
+bot/              ponte com o astroverso-discord (compartilhada pelos módulos)
 n8n/workflows/    fluxos: entrada do Discord + fluxos de cada módulo
 modules/<nome>/   um módulo: código, prompts, presets, banco e scripts
 db/init/          cria o banco de cada módulo numa instalação nova

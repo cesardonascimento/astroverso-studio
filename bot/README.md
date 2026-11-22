@@ -1,14 +1,18 @@
 # bot
 
-Bot do Discord do studio, compartilhado por todos os módulos. Só leva e traz mensagens entre o canal e o n8n: não
-decide nada.
+Ponte do studio com o Discord, compartilhada por todos os módulos. O bot em si é o **astroverso-discord** (o
+`astro`), que atende vários projetos; esta ponte é o cliente `studio` dele. Só leva e traz mensagens entre o canal
+e o n8n: não decide nada.
 
 ## Como funciona
 
 ```
-Discord ⇄ bot ⇄ n8n (/webhook/discord-in) ⇄ módulos
-               ↖ n8n (POST /send)
+Discord ⇄ astroverso-discord ⇄ ponte ⇄ n8n (/webhook/discord-in) ⇄ módulos
+                                    ↖ n8n (POST /send)
 ```
+
+Ao subir (e a cada 5 minutos), a ponte publica no astroverso-discord o canal que ela escuta (`STUDIO_DISCORD_CHANNEL`)
+e o formato dos botões dela. Depois busca os eventos do cliente `studio` (`GET /v1/eventos`) e os entrega ao n8n:
 
 | Do Discord | Vira |
 |---|---|
@@ -16,7 +20,7 @@ Discord ⇄ bot ⇄ n8n (/webhook/discord-in) ⇄ módulos
 | Resposta a uma mensagem do bot | `{"type": "action", "module", "action": "revise" (mensagem com arquivo) ou "replan", "job_id", "text"}` |
 | Botão | `{"type": "action", "module", "action", "job_id"}`; Refazer e Pedir alteração abrem uma caixa de texto antes |
 
-O n8n responde `{"message": "..."}` e o bot repassa no canal.
+O n8n responde `{"message": "..."}` e a ponte devolve ao astroverso-discord, que responde no canal.
 
 Convenções dos módulos:
 
@@ -25,8 +29,8 @@ Convenções dos módulos:
 | `custom_id` dos botões | `<módulo>:<ação>:<id>` (ex.: `cortes:approve:12`) |
 | Rodapé das mensagens | `<módulo> #<id>`: é por ele que uma resposta é ligada ao job |
 
-Botões em outro formato (ex.: de outro bot com o mesmo token) são ignorados. Os botões continuam funcionando depois
-de reiniciar o bot, porque tudo o que ele precisa está no próprio `custom_id`.
+Os botões continuam funcionando depois de reiniciar o bot ou a ponte, porque tudo o que é preciso está no próprio
+`custom_id`.
 
 ## API para o n8n
 
@@ -34,7 +38,7 @@ de reiniciar o bot, porque tudo o que ele precisa está no próprio `custom_id`.
 
 | Campo | O que é |
 |---|---|
-| `channel_id` | Canal (padrão: `DISCORD_CHANNEL_ID`) |
+| `channel_id` | Canal (padrão: o do studio) |
 | `reply_to` | Mensagem a responder (o pedido original) |
 | `content` | Texto, até 2000 caracteres |
 | `embed` | `title`, `description`, `color`, `footer` |
@@ -42,9 +46,7 @@ de reiniciar o bot, porque tudo o que ele precisa está no próprio `custom_id`.
 | `file_name` | Nome do anexo no Discord |
 | `buttons` | Até 5: `label`, `custom_id`, `style` (`primary`, `success`, `danger`, `secondary`) |
 
-## Requisitos no Discord
-
-- **Message Content Intent** ligado no Developer Portal → Bot.
-- Permissões no canal: ver, enviar mensagens, anexar arquivos, ler o histórico e adicionar reações.
+A ponte traduz para `POST /v1/mensagens` do astroverso-discord (com o arquivo enviado junto) e devolve
+`{"message_id"}`.
 
 Logs: `podman logs -f astroverso-studio_bot_1`.
