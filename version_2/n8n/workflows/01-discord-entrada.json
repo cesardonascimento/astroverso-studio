@@ -1,0 +1,117 @@
+{
+  "id": "cortesDiscordIn01",
+  "name": "Cortes — entrada do Discord",
+  "nodes": [
+    {
+      "id": "a1",
+      "name": "Discord (via bot)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 300],
+      "webhookId": "6f0b3c1e-6a0e-4c7e-9d0e-cortes-discord-in",
+      "parameters": { "httpMethod": "POST", "path": "discord-in", "responseMode": "lastNode", "options": {} }
+    },
+    {
+      "id": "a2",
+      "name": "Tipo de pedido",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [240, 300],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+                "conditions": [
+                  { "id": "c1", "leftValue": "={{ $json.body.type }}", "rightValue": "new_cut",
+                    "operator": { "type": "string", "operation": "equals" } }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true, "outputKey": "novo corte"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+                "conditions": [
+                  { "id": "c2", "leftValue": "={{ $json.body.type }}", "rightValue": "action",
+                    "operator": { "type": "string", "operation": "equals" } }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true, "outputKey": "ação num corte"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a3",
+      "name": "Worker: criar corte",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 200],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.WORKER_URL }}/jobs",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "Authorization", "value": "=Bearer {{ $env.WORKER_TOKEN }}" } ] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ url: $json.body.url, instructions: $json.body.instructions || null, auto_approve: false, context: { discord: $json.body.discord } }) }}",
+        "options": { "response": { "response": { "fullResponse": true, "neverError": true } } }
+      }
+    },
+    {
+      "id": "a4",
+      "name": "Worker: ação no corte",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 400],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.WORKER_URL }}/jobs/{{ $json.body.job_id }}/{{ $json.body.action }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "Authorization", "value": "=Bearer {{ $env.WORKER_TOKEN }}" } ] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ text: $json.body.text || '' }) }}",
+        "options": { "response": { "response": { "fullResponse": true, "neverError": true } } }
+      }
+    },
+    {
+      "id": "a5",
+      "name": "Resposta: corte criado",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [760, 200],
+      "parameters": {
+        "jsCode": "const r = $input.first().json;\nif (r.statusCode >= 300) {\n  return [{ json: { message: `⚠️ Não consegui criar o corte: ${JSON.stringify(r.body?.detail ?? r.body)}` } }];\n}\nreturn [{ json: { message: `🎬 Corte #${r.body.id} na fila. Te aviso aqui quando o roteiro estiver pronto.` } }];"
+      }
+    },
+    {
+      "id": "a6",
+      "name": "Resposta: ação",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [760, 400],
+      "parameters": {
+        "jsCode": "const r = $input.first().json;\nconst req = $('Discord (via bot)').first().json.body;\nconst nomes = { approve: '✅ Aprovado! Renderizando o vídeo...', replan: '🔁 Refazendo o roteiro...', revise: '✏️ Aplicando as alterações...', cancel: '🛑 Cancelado.', retry: '🔄 Tentando de novo...' };\nif (r.statusCode >= 300) {\n  return [{ json: { message: `⚠️ Corte #${req.job_id}: ${r.body?.detail ?? 'erro ' + r.statusCode}` } }];\n}\nreturn [{ json: { message: `${nomes[req.action] ?? 'ok'} (corte #${req.job_id})` } }];"
+      }
+    }
+  ],
+  "connections": {
+    "Discord (via bot)": { "main": [ [ { "node": "Tipo de pedido", "type": "main", "index": 0 } ] ] },
+    "Tipo de pedido": { "main": [
+      [ { "node": "Worker: criar corte", "type": "main", "index": 0 } ],
+      [ { "node": "Worker: ação no corte", "type": "main", "index": 0 } ]
+    ] },
+    "Worker: criar corte": { "main": [ [ { "node": "Resposta: corte criado", "type": "main", "index": 0 } ] ] },
+    "Worker: ação no corte": { "main": [ [ { "node": "Resposta: ação", "type": "main", "index": 0 } ] ] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {},
+  "active": false
+}

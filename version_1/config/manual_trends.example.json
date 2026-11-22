@@ -1,0 +1,10 @@
+{
+  "_comment": "EXEMPLO FICTÍCIO para testar o pipeline sem Apify. Copie para manual_trends.json e edite. Não são tendências reais.",
+  "items": [
+    {"kind": "hashtag", "name": "curiosidades", "rank": 1, "posts": 120000, "views": 95000000, "direction": "up", "industries": ["Education"]},
+    {"kind": "hashtag", "name": "voceSabia", "rank": 2, "posts": 80000, "views": 61000000, "direction": "stable", "industries": ["Education"]},
+    {"kind": "hashtag", "name": "historiadobrasil", "rank": 3, "posts": 30000, "views": 22000000, "direction": "up", "industries": ["Education"]},
+    {"kind": "hashtag", "name": "espaco", "rank": 4, "posts": 25000, "views": 18000000, "direction": "up", "industries": ["Science"]},
+    {"kind": "hashtag", "name": "misterio", "rank": 5, "posts": 40000, "views": 33000000, "direction": "stable", "industries": ["Entertainment"]}
+  ]
+}
