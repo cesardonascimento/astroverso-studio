@@ -56,7 +56,7 @@ Nas máquinas com o app, o `.env` usa as mesmas senhas e aponta para o PC-NAS: `
 | `WORK_DATA_DIR` | Pasta local de trabalho (download, transcrição, render). Pode ser apagada com o app parado |
 | `STORAGE_BIND_ADDRESS` | Onde o banco e o S3 escutam. `127.0.0.1` numa máquina só; `0.0.0.0` num PC-NAS |
 | `DATABASE_*` | Endereço, porta, nome, usuário, senha e pasta de dados do Postgres |
-| `S3_*` | Endereço, porta, bucket, chaves e pasta de dados do S3 |
+| `S3_*` | Endereço, porta, bucket, chaves e pasta de dados do S3. A porta de `S3_ENDPOINT` é a mesma de `S3_PORT` |
 | `ANTHROPIC_API_KEY` | Chave da API do Claude: https://console.anthropic.com → API Keys |
 | `LLM_MODEL` | Modelo do Claude |
 | `WHISPER_MODEL` | Modelo de transcrição: `small`, `medium` ou `large-v3` |
@@ -77,13 +77,19 @@ Nas máquinas com o app, o `.env` usa as mesmas senhas e aponta para o PC-NAS: `
 ### Camadas do app
 
 - **`app/config.py`:** o único lugar que lê variáveis de ambiente. Toda variável nova entra também no `.env.example`.
+- **`app/models/`:** as tabelas (SQLAlchemy), só dados. `Generation` é um pedido; `Output` é o resultado dele para
+  uma rede; `OutputVersion` guarda cada versão do roteiro com a estratégia usada e o vídeo; `Job` é a fila de
+  etapas, sempre de uma instância; `Event` é o histórico mostrado na página; `Export` é um envio; `LlmCall` é o custo
+  de cada chamada à IA.
+- **`migrations/`:** migrações do Alembic, aplicadas sozinhas quando o app sobe. Depois de mudar um model, gere uma
+  nova com `alembic revision --autogenerate -m "<o que mudou>"` (dentro da imagem de teste) e revise o arquivo.
+- **`app/lib/`:** integração com o que é de fora e não é IA. `lib/database` abre sessões e aplica as migrações.
 
 ### Testes
 
 ```bash
-cd studio && podman build --target test -t studio-test .
-cd .. && podman run --rm -v .:/repo:Z -w /repo/studio studio-test python -m pytest
+sh scripts/test.sh            # usa o .env; precisa do perfil storage rodando
 ```
 
-Os testes conferem, entre outras coisas, que o `.env.example` lista todas as variáveis usadas pelo app e pelo
+Os testes usam um banco separado (`<DATABASE_NAME>_test`), recriado a cada rodada. Eles conferem, entre outras coisas, que o `.env.example` lista todas as variáveis usadas pelo app e pelo
 `compose.yaml`.

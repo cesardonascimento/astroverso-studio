@@ -103,3 +103,7 @@ O studio é um projeto próprio, independente do Astroverso, que roda em qualque
 - O CDI da GPU (`nvidia-ctk cdi generate`) precisa ser refeito quando o driver da NVIDIA muda.
 - Estratégias editadas pelo site gravam em `studio/content/`: a mudança só fica salva de verdade depois do commit. Cada
   instância tem o próprio checkout, então a outra só recebe depois de um pull.
+- O Postgres e o versitygw escutam na mesma porta dentro e fora do container (`DATABASE_PORT`, `S3_PORT`), para o
+  mesmo `.env` servir ao app na rede do compose e às instâncias de fora.
+- `podman-compose up --build` não recria um container que já existe com a mesma configuração: use
+  `--force-recreate` para pegar a imagem nova.
