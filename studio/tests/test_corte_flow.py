@@ -119,3 +119,26 @@ def test_failure_is_retried_then_recorded(session, database_url, monkeypatch, tm
 def test_missing_required_field_is_rejected(session):
     with pytest.raises(InvalidRequest):
         CreateGeneration(session).execute("a", "corte", {"instructions": "x"}, [Target("tiktok")])
+
+
+def test_rejected_api_key_fails_at_once(session, database_url, fakes, tmp_path, monkeypatch):
+    import anthropic
+    import httpx
+
+    from app.ai.claude import ClaudeCallFailed
+
+    class Rejecting:
+        def execute(self, system, user, output):
+            response = httpx.Response(401, request=httpx.Request("POST", "https://api.anthropic.com"))
+            cause = anthropic.AuthenticationError("invalid x-api-key", response=response, body=None)
+            raise ClaudeCallFailed("a chave da API do Claude foi recusada", ClaudeUsage("claude-opus-5-5"),
+                                   permanent=True) from cause
+
+    monkeypatch.setattr("app.algorithms.corte.steps.plan_cut.generate_structured", lambda: Rejecting())
+    generation = CreateGeneration(session).execute("a", "corte", {"url": "x"}, [Target("tiktok")])
+    session.commit()
+    run_all(session, database_url, tmp_path / "work", "a")
+    output = session.get(Output, generation.outputs[0].id)
+    assert output.state == OutputState.FAILED and "chave da API" in output.last_error
+    failure = session.scalars(select(Event).where(Event.ok.is_(False))).one()
+    assert failure.step == "Roteiro" and failure.message.startswith("falhou:")

@@ -35,10 +35,15 @@ class StructuredResult(Generic[T]):
     usage: ClaudeUsage
 
 
+PERMANENT_ERRORS = (anthropic.AuthenticationError, anthropic.PermissionDeniedError, anthropic.BadRequestError,
+                    anthropic.NotFoundError, ClaudeRefusal)
+
+
 class ClaudeCallFailed(RuntimeError):
-    def __init__(self, message: str, usage: ClaudeUsage):
+    def __init__(self, message: str, usage: ClaudeUsage, permanent: bool = False):
         super().__init__(message)
         self.usage = usage
+        self.permanent = permanent
 
 
 class GenerateStructured(Generic[T]):
@@ -67,9 +72,16 @@ class GenerateStructured(Generic[T]):
         except Exception as error:
             usage.duration_ms = int((time.monotonic() - started) * 1000)
             usage.error = repr(error)[:2000]
-            raise ClaudeCallFailed(str(error), usage) from error
+            raise ClaudeCallFailed(self._describe(error), usage, isinstance(error, PERMANENT_ERRORS)) from error
         usage.duration_ms = int((time.monotonic() - started) * 1000)
         return StructuredResult(value=value, usage=usage)
+
+    def _describe(self, error: Exception) -> str:
+        if isinstance(error, anthropic.AuthenticationError):
+            return "a chave da API do Claude foi recusada (confira ANTHROPIC_API_KEY no .env)"
+        if isinstance(error, anthropic.PermissionDeniedError):
+            return "a chave da API do Claude não tem permissão para este modelo"
+        return str(error)
 
     def _parse(self, response, output: type[T]) -> T:
         if response.stop_reason == "refusal":

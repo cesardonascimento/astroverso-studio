@@ -57,20 +57,22 @@ class RunJob:
             if isinstance(error, ClaudeCallFailed):
                 RecordLlmCall(session).execute(generation, job.step, error.usage)
             text = str(error) or repr(error)
+            label = self._label(generation, job.step)
             job.last_error = text[:4000]
             job.locked_until = None
-            if isinstance(error, StepFailed) or job.attempts >= job.max_attempts:
+            permanent = isinstance(error, StepFailed) or getattr(error, "permanent", False)
+            if permanent or job.attempts >= job.max_attempts:
                 job.state = JobState.FAILED
                 if job.step in SYSTEM_STEPS:
                     self._mark_export_failed(session, output, text)
                 else:
                     self._mark_failed(generation, output, text)
-                RecordEvent(session).execute(generation.id, job.step, f"falhou: {text}", job.output_id, ok=False)
+                RecordEvent(session).execute(generation.id, label, f"falhou: {text}", job.output_id, ok=False)
                 return
             wait = 4 ** (job.attempts - 1)
             job.state = JobState.QUEUED
             job.run_after = func.now() + timedelta(minutes=wait)
-            RecordEvent(session).execute(generation.id, job.step,
+            RecordEvent(session).execute(generation.id, label,
                                          f"tentativa {job.attempts} falhou ({text[:300]}); "
                                          f"nova tentativa em {wait} min", job.output_id, ok=False)
 
@@ -90,3 +92,12 @@ class RunJob:
                                                                        Export.state == ExportState.PENDING):
             export.state = ExportState.FAILED
             export.last_error = text[:4000]
+
+    def _label(self, generation: Generation, step_name: str) -> str:
+        step = SYSTEM_STEPS.get(step_name)
+        if step is None:
+            try:
+                step = get_algorithm(generation.algorithm).step_named(step_name)
+            except LookupError:
+                return step_name
+        return step.label or step_name
