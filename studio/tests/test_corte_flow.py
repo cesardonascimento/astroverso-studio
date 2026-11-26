@@ -50,6 +50,7 @@ def fakes(monkeypatch, tmp_path):
     monkeypatch.setattr("app.algorithms.corte.steps.transcribe_source.FetchCaptions", FakeCaptions)
     monkeypatch.setattr("app.algorithms.corte.steps.plan_cut.generate_structured", lambda: FakeClaude())
     monkeypatch.setattr(settings(), "s3_bucket", f"{settings().s3_bucket}-test")
+    monkeypatch.setattr(settings(), "webdav_dir", "Studio/fluxo")
     EnsureBucket(storage_client()).execute(settings().s3_bucket)
 
 
@@ -80,6 +81,7 @@ def test_auto_approved_cut_goes_from_link_to_video(session, database_url, fakes,
     stream = ReadObject(storage_client(), settings().s3_bucket).execute(version.video_key, "bytes=0-3")
     assert stream.total_size > 10000
     assert session.scalars(select(LlmCall)).one().cost_usd > 0
+    assert version.exports[0].state == "DONE" and version.exports[0].remote_path.startswith("Studio/fluxo/")
     assert [event.step for event in generation.events][:3] == ["pedido", "Download", "Transcrição"]
 
 

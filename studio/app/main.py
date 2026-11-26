@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import APP_DIR, WORK_DIR, settings
-from app.controllers import auth, generations, new_generation, outputs, strategies
+from app.controllers import auth, generations, new_generation, outputs, settings as settings_page, strategies
 from app.controllers.require_login import RequireLogin
 from app.dependencies import storage_client
 from app.lib.database.migrate import MigrateDatabase
@@ -40,6 +40,7 @@ app.include_router(new_generation.router)
 app.include_router(generations.router)
 app.include_router(outputs.router)
 app.include_router(strategies.router)
+app.include_router(settings_page.router)
 
 
 @app.get("/health")

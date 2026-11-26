@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.algorithms.base import Algorithm
 from app.models import Generation, GenerationState, Job, Output, OutputState, VersionKind
+from app.services.exports import RequestExport
 from app.services.jobs import EnqueueJob
 
 
@@ -21,6 +22,7 @@ class AdvanceFlow:
             self._after_planning(algorithm, generation, output)
         else:
             output.state = OutputState.DONE
+            RequestExport(self.session).execute(output)
 
     def _start_planning(self, algorithm: Algorithm, generation: Generation) -> None:
         generation.state = GenerationState.READY

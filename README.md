@@ -30,6 +30,11 @@ estratégia de cada uma; a IA produz o roteiro, você aprova ou edita, e recebe 
 - **Apagar o original:** libera o espaço do vídeo baixado do YouTube. Os cortes prontos ficam; novos roteiros e renders
   daquela geração deixam de ser possíveis.
 - **Listagem:** todas as gerações de todas as instâncias, com filtros por situação e por instância e o custo da IA.
+- **Envio por WebDAV:** quando um vídeo fica pronto, ele vai sozinho para a pasta `WEBDAV_DIR` do Nextcloud (ou outro
+  WebDAV) como `yyyyMMddHHmm - título.mp4`, com um `.txt` ao lado com a legenda do post e as hashtags. Nunca
+  sobrescreve: um nome repetido ganha ` (2)`. Uma falha no envio não estraga o vídeo e dá para enviar de novo.
+- **Configurações:** a página mostra o que está no `.env` (segredos mascarados), se o Whisper está na GPU ou na CPU,
+  e testa a conexão com o WebDAV.
 - **Estratégias editáveis pelo site:** criar, editar (com prévia do markdown), apagar, importar e exportar no formato
   `SKILL.md` (`name` e `description` no cabeçalho). A página grava os arquivos em `studio/content/`; para guardar no
   git, faça commit.
@@ -128,6 +133,7 @@ Nas máquinas com o app, o `.env` usa as mesmas senhas e aponta para o PC-NAS: `
   - **`lib/youtube`:** baixa o vídeo (até 1080p, preferindo H.264) e as legendas do YouTube com tempo por palavra.
   - **`lib/ffmpeg`:** mede vídeos, extrai o áudio, monta o corte vertical 1080x1920 (layouts `crop`, `fit_blur`,
     `split` ou `auto`), queima as legendas ASS palavra por palavra, normaliza o volume e confere a qualidade.
+  - **`lib/webdav`:** cria pastas, confere se um arquivo existe, envia e testa a conexão.
   - **`lib/media.py`:** `Word` e `Segment`, os tipos que circulam entre `lib/` e `ai/`.
   - **`lib/content`:** lê e grava os `.md` com cabeçalho (frontmatter).
 - **`app/ai/`:** tudo que é IA, com a mesma regra da `lib/`.
@@ -150,6 +156,8 @@ Nas máquinas com o app, o `.env` usa as mesmas senhas e aponta para o PC-NAS: `
     novo, cancelar, tentar de novo, abrir o vídeo e montar o nome do arquivo.
   - **`strategies`:** salva, apaga, importa e exporta estratégias como `.md` e gera a prévia do markdown (HTML do
     texto é escapado).
+  - **`exports`:** põe o envio na fila e envia a versão (vídeo + `.txt`) sem sobrescrever.
+  - **`settings`:** monta o resumo da página de configurações.
   - **`jobs`**, **`events`**, **`costs`:** fila, histórico e custo das chamadas à IA.
 - **`app/algorithms/`:** os algoritmos de geração. `base.py` define o contrato: campos do formulário, etapas de
   preparação (uma vez por geração), a etapa de roteiro, as etapas de render (uma vez por rede), o template que mostra
@@ -157,7 +165,8 @@ Nas máquinas com o app, o `.env` usa as mesmas senhas e aponta para o PC-NAS: `
   classe com `name`, `label` e `execute(context)`, que devolve a mensagem do histórico; `StepFailed` encerra sem novas
   tentativas.
 - **`app/worker/`:** reserva o próximo job da instância (`FOR UPDATE SKIP LOCKED`), roda a etapa e decide a próxima:
-  preparação → roteiro de cada rede → aprovação (ou direto, com `auto_approve` e nas revisões) → render → pronto.
+  preparação → roteiro de cada rede → aprovação (ou direto, com `auto_approve` e nas revisões) → render → pronto →
+  envio WebDAV. O envio é uma etapa do sistema (`worker/export_step.py`), igual para todos os algoritmos.
 
 ### Como criar um algoritmo
 

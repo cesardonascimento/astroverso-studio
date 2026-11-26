@@ -11,6 +11,7 @@ from app.controllers.flash import redirect_with_flash
 from app.controllers.templates import templates
 from app.models import Output, VersionKind
 from app.services.catalog import ListSubtitlePresets
+from app.services.exports import RequestExport
 from app.services.generations import DescribeProgress
 from app.services.outputs import (ActionNotAllowed, ApproveOutput, BuildVideoName, CancelOutput, OpenVideo, ReplanOutput,
                                  RerenderOutput, RetryOutput)
@@ -114,3 +115,15 @@ def video(request: Request, output_id: int, version: int, download: bool = False
         headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(name)}"
     return StreamingResponse(stream.chunks, status_code=206 if stream.content_range else 200,
                              media_type="video/mp4", headers=headers)
+
+
+@router.post("/outputs/{output_id}/export")
+def export(request: Request, output_id: int, session: Session = Depends(database)):
+    output = load(session, output_id)
+    try:
+        requested = RequestExport(session).execute(output)
+    except ActionNotAllowed as error:
+        return back(request, output, str(error), "danger")
+    if requested is None:
+        return back(request, output, "WebDAV desligado: preencha WEBDAV_URL no .env.", "warning")
+    return back(request, output, "Envio para o WebDAV na fila.")

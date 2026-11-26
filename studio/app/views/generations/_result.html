@@ -4,7 +4,16 @@
     <video class="vertical w-100 rounded" controls preload="metadata" src="/outputs/{{ output.id }}/videos/{{ version.version }}"></video>
     <div class="d-flex gap-2 justify-content-center mt-2">
       <a class="btn btn-primary" href="/outputs/{{ output.id }}/videos/{{ version.version }}?download=1">{{ icon("download", "icon me-1") }}Baixar</a>
+      <form method="post" action="/outputs/{{ output.id }}/export"><button class="btn" title="Enviar para o WebDAV">{{ icon("cloud-upload", "icon me-1") }}Enviar</button></form>
     </div>
+    {% set last_export = version.exports[-1] if version.exports else None %}
+    {% if last_export %}
+    <div class="small mt-2 {% if last_export.state == 'FAILED' %}text-danger{% elif last_export.state == 'DONE' %}text-success{% else %}text-secondary{% endif %}">
+      {% if last_export.state == "DONE" %}{{ icon("check", "icon me-1") }}Enviado: {{ last_export.remote_path }}
+      {% elif last_export.state == "FAILED" %}{{ icon("alert-triangle", "icon me-1") }}Envio falhou: {{ last_export.last_error }}
+      {% else %}<span class="spinner-border spinner-border-sm me-1"></span>Enviando para o WebDAV…{% endif %}
+    </div>
+    {% endif %}
     <div class="text-secondary small mt-2">{{ (version.duration_s or 0) | float | round | int }} s · {{ version.render_report.get("layout") }} · legenda {{ version.render_report.get("subtitle_preset") }}</div>
     {% set warnings = (version.render_report.get("quality") or {}).get("checks", []) | rejectattr("ok") | list %}
     {% if warnings %}<div class="text-warning small mt-1">{{ icon("alert-triangle", "icon me-1") }}{% for check in warnings %}{{ check.name }} ({{ check.detail }}){% if not loop.last %}, {% endif %}{% endfor %}</div>{% endif %}

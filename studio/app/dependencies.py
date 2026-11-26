@@ -4,6 +4,7 @@ from app.ai.claude import GenerateStructured
 from app.ai.whisper import TranscribeAudio
 from app.config import settings
 from app.lib.s3 import DeleteObject, DownloadFile, ReadObject, UploadFile, s3_client
+from app.lib.webdav import WebdavConnection
 from app.lib.youtube import DownloadVideo
 
 
@@ -40,3 +41,10 @@ def transcribe_audio() -> TranscribeAudio:
 def generate_structured() -> GenerateStructured:
     config = settings()
     return GenerateStructured(config.anthropic_api_key, config.llm_model)
+
+
+def webdav_connection() -> WebdavConnection | None:
+    config = settings()
+    if not config.webdav_url:
+        return None
+    return WebdavConnection(config.webdav_url, config.webdav_user, config.webdav_password)

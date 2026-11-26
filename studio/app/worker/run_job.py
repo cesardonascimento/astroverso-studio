@@ -8,10 +8,13 @@ from app.ai.claude import ClaudeCallFailed
 from app.algorithms import get_algorithm
 from app.algorithms.base import StepContext, StepFailed
 from app.lib.database import open_session
-from app.models import Generation, GenerationState, Job, JobState, Output, OutputState
+from app.models import Export, ExportState, Generation, GenerationState, Job, JobState, Output, OutputState, OutputVersion
 from app.services.costs import RecordLlmCall
 from app.services.events import RecordEvent
 from app.worker.advance_flow import AdvanceFlow
+from app.worker.export_step import ExportStep
+
+SYSTEM_STEPS = {ExportStep.name: ExportStep}
 
 log = logging.getLogger(__name__)
 CANCELLED = {GenerationState.CANCELLED, OutputState.CANCELLED}
@@ -33,14 +36,15 @@ class RunJob:
                     job.state = JobState.CANCELLED
                     return
                 algorithm = get_algorithm(generation.algorithm)
-                step = algorithm.step_named(job.step)()
+                step = (SYSTEM_STEPS.get(job.step) or algorithm.step_named(job.step))()
                 message = step.execute(StepContext(session, generation, self.workspace, output))
                 RecordEvent(session).execute(generation.id, step.label or step.name,
                                              f"{message} · {time.monotonic() - started:.0f} s", job.output_id)
                 job.state = JobState.DONE
                 job.locked_until = None
                 job.last_error = None
-                AdvanceFlow(session).execute(algorithm, job, generation, output)
+                if job.step not in SYSTEM_STEPS:
+                    AdvanceFlow(session).execute(algorithm, job, generation, output)
         except Exception as error:
             log.exception("job %s falhou", job_id)
             self._register_failure(job_id, error)
@@ -57,7 +61,10 @@ class RunJob:
             job.locked_until = None
             if isinstance(error, StepFailed) or job.attempts >= job.max_attempts:
                 job.state = JobState.FAILED
-                self._mark_failed(generation, output, text)
+                if job.step in SYSTEM_STEPS:
+                    self._mark_export_failed(session, output, text)
+                else:
+                    self._mark_failed(generation, output, text)
                 RecordEvent(session).execute(generation.id, job.step, f"falhou: {text}", job.output_id, ok=False)
                 return
             wait = 4 ** (job.attempts - 1)
@@ -77,3 +84,9 @@ class RunJob:
             return
         output.state = OutputState.FAILED
         output.last_error = text[:4000]
+
+    def _mark_export_failed(self, session, output: Output, text: str) -> None:
+        for export in session.query(Export).join(OutputVersion).filter(OutputVersion.output_id == output.id,
+                                                                       Export.state == ExportState.PENDING):
+            export.state = ExportState.FAILED
+            export.last_error = text[:4000]

@@ -34,3 +34,4 @@ class OutputVersion(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     output: Mapped["Output"] = relationship(back_populates="versions")
+    exports: Mapped[list["Export"]] = relationship(order_by="Export.id")
