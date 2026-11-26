@@ -1,0 +1,68 @@
+{% from "macros.html" import icon %}
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Studio{% endblock %} · Astroverso Studio</title>
+  <link rel="stylesheet" href="/static/vendor/tabler/tabler.min.css">
+  <link rel="stylesheet" href="/static/css/studio.css">
+  <script>document.documentElement.dataset.bsTheme = localStorage.getItem("theme") || "dark";</script>
+  <script defer src="/static/vendor/tabler/tabler.min.js"></script>
+  <script defer src="/static/vendor/htmx/htmx.min.js"></script>
+  <script defer src="/static/vendor/alpine/alpine.min.js"></script>
+</head>
+<body>
+<div class="page">
+  <header class="navbar navbar-expand-md d-print-none">
+    <div class="container-xl">
+      <a href="/" class="navbar-brand navbar-brand-autodark pe-3">{{ icon("movie", "icon text-primary me-2") }}Studio</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#menu">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="menu">
+        <ul class="navbar-nav">
+          {% set path = request.url.path %}
+          <li class="nav-item {% if path.startswith('/generations') and path != '/generations/new' %}active{% endif %}">
+            <a class="nav-link" href="/generations">{{ icon("list", "nav-link-icon") }}<span class="nav-link-title">Gerações</span></a>
+          </li>
+          <li class="nav-item {% if path == '/generations/new' %}active{% endif %}">
+            <a class="nav-link" href="/generations/new">{{ icon("plus", "nav-link-icon") }}<span class="nav-link-title">Nova geração</span></a>
+          </li>
+          <li class="nav-item {% if path.startswith('/strategies') %}active{% endif %}">
+            <a class="nav-link" href="/strategies">{{ icon("bulb", "nav-link-icon") }}<span class="nav-link-title">Estratégias</span></a>
+          </li>
+          <li class="nav-item {% if path.startswith('/settings') %}active{% endif %}">
+            <a class="nav-link" href="/settings">{{ icon("adjustments", "nav-link-icon") }}<span class="nav-link-title">Configurações</span></a>
+          </li>
+        </ul>
+        <div class="navbar-nav ms-md-auto align-items-center gap-2">
+          <span class="badge bg-secondary-lt" title="Instância">{{ instance_name() }}</span>
+          <button class="btn btn-ghost-secondary btn-icon" type="button" title="Tema claro/escuro"
+                  onclick="const t = document.documentElement.dataset.bsTheme === 'dark' ? 'light' : 'dark'; document.documentElement.dataset.bsTheme = t; localStorage.setItem('theme', t)">◐</button>
+          <form method="post" action="/logout">
+            <button class="btn btn-ghost-secondary btn-icon" title="Sair">{{ icon("logout") }}</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </header>
+  <div class="page-wrapper">
+    <div class="page-header d-print-none">
+      <div class="container-xl">
+        <div class="row align-items-center g-2">
+          <div class="col">
+            {% block pretitle %}{% endblock %}
+            <h2 class="page-title">{% block heading %}{% endblock %}</h2>
+          </div>
+          <div class="col-auto">{% block actions %}{% endblock %}</div>
+        </div>
+      </div>
+    </div>
+    <div class="page-body">
+      <div class="container-xl">{% block content %}{% endblock %}</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

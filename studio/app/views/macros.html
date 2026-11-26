@@ -1,0 +1,20 @@
+{% macro icon(name, cls="icon") -%}
+<span class="{{ cls }} d-inline-flex">{% include "icons/" ~ name ~ ".svg" %}</span>
+{%- endmacro %}
+
+{% set STATES = {
+  "PREPARING": ("Preparando", "blue"),
+  "READY": ("Pronta", "green"),
+  "WAITING": ("Aguardando", "secondary"),
+  "PLANNING": ("Escrevendo roteiro", "blue"),
+  "AWAITING_APPROVAL": ("Aguardando aprovação", "yellow"),
+  "RENDERING": ("Renderizando", "blue"),
+  "DONE": ("Pronto", "green"),
+  "FAILED": ("Falhou", "red"),
+  "CANCELLED": ("Cancelado", "secondary"),
+} %}
+
+{% macro state_badge(state) -%}
+{% set label, color = STATES.get(state, (state, "secondary")) %}
+<span class="badge bg-{{ color }}-lt">{% if color == "blue" %}<span class="status-dot status-dot-animated status-blue me-1"></span>{% endif %}{{ label }}</span>
+{%- endmacro %}

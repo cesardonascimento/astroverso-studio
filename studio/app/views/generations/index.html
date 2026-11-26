@@ -1,0 +1,38 @@
+{% extends "layout.html" %}
+{% from "macros.html" import icon, state_badge %}
+{% block title %}Gerações{% endblock %}
+{% block heading %}Gerações{% endblock %}
+{% block actions %}<a class="btn btn-primary" href="/generations/new">{{ icon("plus", "icon me-1") }}Nova geração</a>{% endblock %}
+{% block content %}
+{% if not generations %}
+<div class="empty">
+  <p class="empty-title">Nenhuma geração ainda</p>
+  <p class="empty-subtitle text-secondary">Comece mandando o link de um vídeo.</p>
+  <div class="empty-action"><a class="btn btn-primary" href="/generations/new">{{ icon("plus", "icon me-1") }}Nova geração</a></div>
+</div>
+{% else %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-vcenter card-table">
+      <thead><tr><th>#</th><th>Vídeo</th><th>Saídas</th><th>Instância</th><th>Criada</th></tr></thead>
+      <tbody>
+      {% for generation in generations %}
+        <tr>
+          <td class="text-secondary">{{ generation.id }}</td>
+          <td><a href="/generations/{{ generation.id }}">{{ generation.title or generation.inputs.get("url") }}</a></td>
+          <td>
+            {% if generation.state in ("PREPARING", "FAILED", "CANCELLED") %}{{ state_badge(generation.state) }}{% endif %}
+            {% if generation.state not in ("FAILED", "CANCELLED") %}
+              {% for output in generation.outputs %}<span class="me-1">{{ state_badge(output.state) }}</span>{% endfor %}
+            {% endif %}
+          </td>
+          <td><span class="badge bg-secondary-lt">{{ generation.instance }}</span></td>
+          <td class="text-secondary">{{ generation.created_at | local_time }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

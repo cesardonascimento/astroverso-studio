@@ -30,3 +30,21 @@ def session(database_url: str):
     with Session(engine, expire_on_commit=False) as db_session:
         yield db_session
     engine.dispose()
+
+
+@pytest.fixture
+def client(session, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from app.controllers.database import database
+    from app.main import app
+
+    def test_database():
+        yield session
+        session.commit()
+
+    app.dependency_overrides[database] = test_database
+    test_client = TestClient(app)
+    test_client.post("/login", data={"password": settings().studio_password})
+    yield test_client
+    app.dependency_overrides.clear()

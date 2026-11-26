@@ -1,0 +1,29 @@
+{% from "macros.html" import icon %}
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Entrar · Astroverso Studio</title>
+  <link rel="stylesheet" href="/static/vendor/tabler/tabler.min.css">
+  <script>document.documentElement.dataset.bsTheme = localStorage.getItem("theme") || "dark";</script>
+</head>
+<body class="d-flex flex-column">
+<div class="page page-center">
+  <div class="container container-tight py-4">
+    <div class="text-center mb-4 h1">{{ icon("movie", "icon icon-lg text-primary me-2") }}Studio</div>
+    <form class="card card-md" method="post" action="/login">
+      <div class="card-body">
+        <h2 class="h2 text-center mb-4">Entrar</h2>
+        {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+        <div class="mb-3">
+          <label class="form-label" for="password">Senha</label>
+          <input class="form-control" id="password" name="password" type="password" autofocus required>
+        </div>
+        <button class="btn btn-primary w-100">{{ icon("lock", "icon me-1") }}Entrar</button>
+      </div>
+    </form>
+  </div>
+</div>
+</body>
+</html>

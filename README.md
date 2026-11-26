@@ -18,6 +18,8 @@ estratégia de cada uma; a IA produz o roteiro, você aprova ou edita, e recebe 
 - **Vídeos como arquivos comuns:** o S3 (versitygw) grava cada objeto como arquivo numa pasta do disco, fácil de
   navegar e de copiar para backup.
 
+- **Página com login:** uma senha só (`STUDIO_PASSWORD`), cookie assinado por 30 dias. Tema claro e escuro.
+
 ### Algoritmos
 
 - **Corte de vídeo (`corte`):** recebe o link de um vídeo longo do YouTube e instruções opcionais. Baixa o vídeo,
@@ -117,6 +119,12 @@ Nas máquinas com o app, o `.env` usa as mesmas senhas e aponta para o PC-NAS: `
   - **`ai/claude`:** uma chamada que devolve JSON validado por um model Pydantic, com o uso de tokens e o custo.
   - **`ai/whisper`:** transcrição com tempo por palavra (faster-whisper), na GPU quando houver.
 
+- **`app/controllers/`:** rotas por área. Recebem a requisição, chamam um service e renderizam uma view. Sem regra de
+  negócio. `require_login.py` protege tudo, menos `/login`, `/static` e `/health` (pedidos do htmx recebem
+  `HX-Redirect`).
+- **`app/views/`:** templates Jinja2. `layout.html` tem o menu; `macros.html` tem `icon()` e `state_badge()`;
+  `icons/` guarda só os SVGs usados (Tabler Icons).
+- **`app/static/`:** `css/studio.css` e `vendor/` com Tabler, htmx e Alpine.js versionados, sem build.
 - **`app/dependencies.py`:** monta as peças de `lib/` e `ai/` com as configurações (cliente do S3, Claude, Whisper,
   YouTube). Nos testes, é aqui que se troca uma peça por uma falsa.
 - **`app/services/<domínio>/`:** as regras do studio, uma classe por feature com um método `execute`.
