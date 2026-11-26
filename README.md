@@ -18,6 +18,8 @@ estratégia de cada uma; a IA produz o roteiro, você aprova ou edita, e recebe 
 - **Vídeos como arquivos comuns:** o S3 (versitygw) grava cada objeto como arquivo numa pasta do disco, fácil de
   navegar e de copiar para backup.
 
+- **Nova geração em três passos:** escolha o algoritmo, preencha o pedido (os campos vêm do algoritmo) e marque as
+  redes, com estratégia, enquadramento, legenda e a opção de renderizar sem esperar a aprovação.
 - **Página com login:** uma senha só (`STUDIO_PASSWORD`), cookie assinado por 30 dias. Tema claro e escuro.
 
 ### Algoritmos
@@ -129,7 +131,8 @@ Nas máquinas com o app, o `.env` usa as mesmas senhas e aponta para o PC-NAS: `
   YouTube). Nos testes, é aqui que se troca uma peça por uma falsa.
 - **`app/services/<domínio>/`:** as regras do studio, uma classe por feature com um método `execute`.
   - **`catalog`:** lê redes, estratégias e presets de legenda de `content/`.
-  - **`generations`:** cria uma geração, valida os campos do algoritmo e as estratégias e põe a primeira etapa na fila.
+  - **`generations`:** cria uma geração (valida os campos do algoritmo e as estratégias e põe a primeira etapa na fila),
+    transforma o formulário em destinos (`BuildTargets`) e lista as gerações.
   - **`jobs`**, **`events`**, **`costs`:** fila, histórico e custo das chamadas à IA.
 - **`app/algorithms/`:** os algoritmos de geração. `base.py` define o contrato: campos do formulário, etapas de
   preparação (uma vez por geração), a etapa de roteiro e as etapas de render (uma vez por rede). Cada etapa é uma

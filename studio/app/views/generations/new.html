@@ -1,0 +1,120 @@
+{% extends "layout.html" %}
+{% from "macros.html" import icon %}
+{% block title %}Nova geração{% endblock %}
+{% block heading %}Nova geração{% endblock %}
+{% block content %}
+<form method="post" action="/generations" x-data="{ algorithm: '{{ values.get('algorithm', algorithms[0].id) }}', step: 1 }">
+  {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+  <ul class="steps steps-counter mb-4">
+    <li class="step-item" :class="{ active: step === 1 }"><a href="#" @click.prevent="step = 1">Algoritmo</a></li>
+    <li class="step-item" :class="{ active: step === 2 }"><a href="#" @click.prevent="step = 2">Pedido</a></li>
+    <li class="step-item" :class="{ active: step === 3 }"><a href="#" @click.prevent="step = 3">Redes e estratégias</a></li>
+  </ul>
+
+  <div x-show="step === 1">
+    <div class="row row-cards">
+      {% for algorithm in algorithms %}
+      <div class="col-md-6 col-lg-4">
+        <label class="form-selectgroup-item w-100 h-100">
+          <input type="radio" name="algorithm" value="{{ algorithm.id }}" class="form-selectgroup-input" x-model="algorithm">
+          <div class="form-selectgroup-label d-flex flex-column align-items-start text-start p-3 h-100">
+            <div class="fw-bold mb-1">{{ icon("movie", "icon me-1 text-primary") }}{{ algorithm.name }}</div>
+            <div class="text-secondary">{{ algorithm.description }}</div>
+          </div>
+        </label>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="mt-4"><button type="button" class="btn btn-primary" @click="step = 2">Continuar {{ icon("chevron-right", "icon ms-1") }}</button></div>
+  </div>
+
+  <div x-show="step === 2" x-cloak>
+    <div class="card"><div class="card-body">
+      {% for algorithm in algorithms %}
+      <template x-if="algorithm === '{{ algorithm.id }}'">
+        <div>
+          {% for field in algorithm.fields %}
+          <div class="mb-3">
+            <label class="form-label {% if field.required %}required{% endif %}" for="input-{{ field.name }}">{{ field.label }}</label>
+            {% if field.kind == "textarea" %}
+              <textarea class="form-control" rows="3" id="input-{{ field.name }}" name="input.{{ field.name }}">{{ values.get("input." ~ field.name, "") }}</textarea>
+            {% else %}
+              <input class="form-control" type="{{ 'url' if field.kind == 'url' else 'text' }}" id="input-{{ field.name }}" name="input.{{ field.name }}" value="{{ values.get('input.' ~ field.name, '') }}">
+            {% endif %}
+            {% if field.help %}<div class="form-hint">{{ field.help }}</div>{% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </template>
+      {% endfor %}
+    </div></div>
+    <div class="mt-4 d-flex gap-2">
+      <button type="button" class="btn" @click="step = 1">Voltar</button>
+      <button type="button" class="btn btn-primary" @click="step = 3">Continuar {{ icon("chevron-right", "icon ms-1") }}</button>
+    </div>
+  </div>
+
+  <div x-show="step === 3" x-cloak>
+    <div class="row row-cards">
+      {% for network in networks %}
+      <div class="col-lg-6" x-data="{ on: true, strategy: 'auto' }">
+        <div class="card" :class="{ 'card-active': on }">
+          <div class="card-header">
+            <label class="form-check form-switch m-0">
+              <input class="form-check-input" type="checkbox" name="network" value="{{ network.id }}" x-model="on" checked>
+              <span class="form-check-label fw-bold">{{ network.name }}</span>
+            </label>
+            <div class="card-actions text-secondary small">{{ network.min_duration_s }}–{{ network.max_duration_s }} s</div>
+          </div>
+          <div class="card-body" x-show="on">
+            <label class="form-label">Estratégia</label>
+            <div class="form-selectgroup form-selectgroup-pills mb-2">
+              <label class="form-selectgroup-item">
+                <input type="radio" name="strategy.{{ network.id }}" value="auto" class="form-selectgroup-input" x-model="strategy">
+                <span class="form-selectgroup-label">{{ icon("sparkles", "icon me-1") }}Auto</span>
+              </label>
+              {% for strategy in network.strategies %}
+              <label class="form-selectgroup-item">
+                <input type="radio" name="strategy.{{ network.id }}" value="{{ strategy.name }}" class="form-selectgroup-input" x-model="strategy">
+                <span class="form-selectgroup-label">{{ strategy.name }}</span>
+              </label>
+              {% endfor %}
+            </div>
+            <div class="form-hint mb-3">
+              <span x-show="strategy === 'auto'">A IA escolhe a estratégia que mais combina com o vídeo.</span>
+              {% for strategy in network.strategies %}<span x-show="strategy === '{{ strategy.name }}'">{{ strategy.description }}</span>{% endfor %}
+            </div>
+            <div class="row g-2">
+              <div class="col-sm-6">
+                <label class="form-label">Enquadramento</label>
+                <select class="form-select" name="layout.{{ network.id }}">
+                  <option value="auto">Automático</option>
+                  <option value="crop">Tela cheia (corta as laterais)</option>
+                  <option value="fit_blur">Vídeo inteiro com fundo desfocado</option>
+                </select>
+              </div>
+              <div class="col-sm-6">
+                <label class="form-label">Legenda</label>
+                <select class="form-select" name="subtitle.{{ network.id }}">
+                  {% for preset in presets %}
+                  <option value="{{ preset.name }}" {% if preset.name == network.subtitle_preset %}selected{% endif %} title="{{ preset.description }}">{{ preset.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+            <label class="form-check mt-3">
+              <input class="form-check-input" type="checkbox" name="auto_approve.{{ network.id }}" value="1">
+              <span class="form-check-label">Renderizar direto, sem esperar a aprovação do roteiro</span>
+            </label>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="mt-4 d-flex gap-2">
+      <button type="button" class="btn" @click="step = 2">Voltar</button>
+      <button class="btn btn-primary">{{ icon("sparkles", "icon me-1") }}Gerar</button>
+    </div>
+  </div>
+</form>
+{% endblock %}

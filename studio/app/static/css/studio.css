@@ -3,3 +3,4 @@
 .nav-link-icon svg { width: 1.25rem; height: 1.25rem; }
 .transcript-word { cursor: pointer; }
 video.vertical { max-height: 70vh; aspect-ratio: 9 / 16; background: #000; }
+[x-cloak] { display: none !important; }
