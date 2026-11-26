@@ -1,0 +1,39 @@
+{% extends "layout.html" %}
+{% from "macros.html" import icon %}
+{% block title %}Estratégias{% endblock %}
+{% block heading %}Estratégias{% endblock %}
+{% block content %}
+<p class="text-secondary">Cada estratégia é um arquivo <code>.md</code> em <code>studio/content/networks/&lt;rede&gt;/strategies/</code>. A descrição é o que a IA lê no modo Auto para escolher; o texto é a orientação que ela segue.</p>
+{% for network in networks %}
+<div class="d-flex align-items-center justify-content-between mt-4 mb-2">
+  <h3 class="m-0">{{ network.name }}</h3>
+  <div class="d-flex gap-2">
+    <form method="post" action="/strategies/{{ network.id }}/import" enctype="multipart/form-data" class="d-flex gap-2">
+      <label class="btn btn-ghost-secondary btn-sm mb-0">{{ icon("cloud-upload", "icon me-1") }}Importar .md
+        <input type="file" name="file" accept=".md,text/markdown" class="d-none" onchange="this.form.submit()">
+      </label>
+    </form>
+    <a class="btn btn-primary btn-sm" href="/strategies/{{ network.id }}/new">{{ icon("plus", "icon me-1") }}Nova estratégia</a>
+  </div>
+</div>
+<div class="row row-cards">
+  {% for strategy in network.strategies %}
+  <div class="col-md-6 col-lg-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h4 class="card-title mb-1">{{ strategy.name }}</h4>
+        <p class="text-secondary mb-0">{{ strategy.description }}</p>
+      </div>
+      <div class="card-footer d-flex gap-2">
+        <a class="btn btn-sm" href="/strategies/{{ network.id }}/{{ strategy.name }}">{{ icon("pencil", "icon me-1") }}Editar</a>
+        <a class="btn btn-sm btn-ghost-secondary" href="/strategies/{{ network.id }}/{{ strategy.name }}/export" title="Baixar como .md">{{ icon("download") }}</a>
+        <form method="post" action="/strategies/{{ network.id }}/{{ strategy.name }}/delete" class="ms-auto" onsubmit="return confirm('Apagar a estratégia {{ strategy.name }}?')">
+          <button class="btn btn-sm btn-ghost-danger" title="Apagar">{{ icon("trash") }}</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endfor %}
+{% endblock %}

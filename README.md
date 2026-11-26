@@ -30,6 +30,9 @@ estratégia de cada uma; a IA produz o roteiro, você aprova ou edita, e recebe 
 - **Apagar o original:** libera o espaço do vídeo baixado do YouTube. Os cortes prontos ficam; novos roteiros e renders
   daquela geração deixam de ser possíveis.
 - **Listagem:** todas as gerações de todas as instâncias, com filtros por situação e por instância e o custo da IA.
+- **Estratégias editáveis pelo site:** criar, editar (com prévia do markdown), apagar, importar e exportar no formato
+  `SKILL.md` (`name` e `description` no cabeçalho). A página grava os arquivos em `studio/content/`; para guardar no
+  git, faça commit.
 - **Página com login:** uma senha só (`STUDIO_PASSWORD`), cookie assinado por 30 dias. Tema claro e escuro.
 
 ### Algoritmos
@@ -145,6 +148,8 @@ Nas máquinas com o app, o `.env` usa as mesmas senhas e aponta para o PC-NAS: `
     transforma o formulário em destinos (`BuildTargets`), lista com filtros e apaga o original.
   - **`outputs`:** aprovar (com edição, que vira uma nova versão), pedir outro roteiro ou uma alteração, renderizar de
     novo, cancelar, tentar de novo, abrir o vídeo e montar o nome do arquivo.
+  - **`strategies`:** salva, apaga, importa e exporta estratégias como `.md` e gera a prévia do markdown (HTML do
+    texto é escapado).
   - **`jobs`**, **`events`**, **`costs`:** fila, histórico e custo das chamadas à IA.
 - **`app/algorithms/`:** os algoritmos de geração. `base.py` define o contrato: campos do formulário, etapas de
   preparação (uma vez por geração), a etapa de roteiro, as etapas de render (uma vez por rede), o template que mostra
@@ -165,7 +170,8 @@ Nas máquinas com o app, o `.env` usa as mesmas senhas e aponta para o PC-NAS: `
 ### Como criar uma rede ou uma estratégia
 
 - **Rede:** uma pasta `content/networks/<rede>/` com `network.md` e pelo menos uma estratégia.
-- **Estratégia:** um `.md` em `content/networks/<rede>/strategies/`. Ela aparece no formulário e no modo Auto.
+- **Estratégia:** pela página **Estratégias** ou com um `.md` em `content/networks/<rede>/strategies/`. Ela aparece
+  no formulário e no modo Auto.
 
 ### Testes
 

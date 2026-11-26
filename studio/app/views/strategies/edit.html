@@ -1,0 +1,36 @@
+{% extends "layout.html" %}
+{% from "macros.html" import icon %}
+{% block title %}Estratégia{% endblock %}
+{% block pretitle %}<div class="page-pretitle">Estratégias · {{ network }}</div>{% endblock %}
+{% block heading %}{{ strategy.name if strategy and previous_name else "Nova estratégia" }}{% endblock %}
+{% block content %}
+{% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
+<form method="post" action="/strategies/{{ network }}">
+  <input type="hidden" name="previous_name" value="{{ previous_name }}">
+  <div class="row g-3">
+    <div class="col-md-4">
+      <label class="form-label required" for="name">Nome</label>
+      <input class="form-control" id="name" name="name" value="{{ strategy.name if strategy else '' }}" placeholder="ex.: asmr">
+      <div class="form-hint">Vira o nome do arquivo: letras minúsculas, números e hífen.</div>
+    </div>
+    <div class="col-md-8">
+      <label class="form-label required" for="description">Descrição</label>
+      <input class="form-control" id="description" name="description" value="{{ strategy.description if strategy else '' }}" placeholder="Quando usar e o que ela prioriza, numa frase">
+      <div class="form-hint">É o que a IA lê no modo Auto para decidir se esta estratégia combina com o vídeo.</div>
+    </div>
+    <div class="col-lg-6">
+      <label class="form-label required" for="text">Texto (markdown)</label>
+      <textarea class="form-control font-monospace" id="text" name="text" rows="18"
+                hx-post="/strategies/preview" hx-trigger="input changed delay:400ms" hx-target="#preview">{{ strategy.text if strategy else "## Gancho\n\n## Ritmo\n\n## Texto da tela e legenda\n" }}</textarea>
+    </div>
+    <div class="col-lg-6">
+      <label class="form-label">Prévia</label>
+      <div class="card"><div class="card-body markdown" id="preview">{{ preview | safe }}</div></div>
+    </div>
+  </div>
+  <div class="mt-3 d-flex gap-2">
+    <button class="btn btn-primary">{{ icon("check", "icon me-1") }}Salvar</button>
+    <a class="btn" href="/strategies">Voltar</a>
+  </div>
+</form>
+{% endblock %}
