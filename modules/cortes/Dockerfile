@@ -18,12 +18,6 @@ RUN mkdir -p /usr/share/fonts/truetype/montserrat \
 RUN curl -fsSL https://deno.land/install.sh | DENO_INSTALL=/usr/local sh -s -- -y \
  && deno --version
 
-# Claude Code CLI (LLM_PROVIDER=claude_code)
-ARG CLAUDE_CODE_VERSION=2.1.330
-RUN curl -fsSL https://claude.ai/install.sh | bash -s ${CLAUDE_CODE_VERSION} \
- && ln -sf /root/.local/bin/claude /usr/local/bin/claude \
- && claude --version
-
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install -r requirements.txt

@@ -1,5 +1,5 @@
 # Astroverso Studio
-# Base compartilhada (postgres, n8n, ponte com o Discord) + um serviço por módulo (modules/<módulo>).
+# Base compartilhada (postgres) + um serviço por módulo (modules/<módulo>).
 # Rodar no Linux/WSL:  podman-compose up -d --build
 
 name: astroverso-studio
@@ -24,45 +24,6 @@ services:
       timeout: 5s
       retries: 10
 
-  n8n:
-    image: docker.io/n8nio/n8n:stable
-    restart: unless-stopped
-    environment:
-      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
-      N8N_SECURE_COOKIE: "false"
-      N8N_DIAGNOSTICS_ENABLED: "false"
-      N8N_PERSONALIZATION_ENABLED: "false"
-      GENERIC_TIMEZONE: ${TZ:-UTC}
-      TZ: ${TZ:-UTC}
-      # os fluxos leem estes valores com $env (nenhum segredo fica gravado nos fluxos)
-      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
-      WORKER_TOKEN: ${WORKER_TOKEN}
-      BOT_URL: http://bot:8000
-      BOT_API_TOKEN: ${BOT_API_TOKEN}
-      CORTES_URL: http://cortes:8080
-    volumes:
-      - n8n_data:/home/node/.n8n
-      - ./n8n/workflows:/workflows:ro
-    ports:
-      - "127.0.0.1:5678:5678"
-
-  bot:
-    build: ./bot
-    restart: unless-stopped
-    environment:
-      # o bot do Discord é o astroverso-discord; esta é a ponte do cliente studio
-      ASTROVERSO_DISCORD_URL: ${ASTROVERSO_DISCORD_URL}
-      ASTROVERSO_DISCORD_KEY: ${ASTROVERSO_DISCORD_KEY}
-      STUDIO_DISCORD_CHANNEL: ${STUDIO_DISCORD_CHANNEL:-studio}
-      # módulo que recebe as mensagens com link no canal
-      STUDIO_DEFAULT_MODULE: ${STUDIO_DEFAULT_MODULE:-cortes}
-      N8N_WEBHOOK_BASE: http://n8n:5678/webhook
-      BOT_API_TOKEN: ${BOT_API_TOKEN}
-      MEDIA_DIR: /data
-    volumes:
-      - ./data:/data:ro
-      - ./bot/bot.py:/app/bot.py:ro
-
   # ---------------------------------------------------------------- módulos
   cortes:
     build: ./modules/cortes
@@ -75,7 +36,6 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/cortes
       MEDIA_DIR: /data/media
       PROMPTS_DIR: /app/prompts
-      N8N_EVENTS_URL: http://n8n:5678/webhook/cortes-events
     volumes:
       - ./data/cortes:/data/media
       - ./modules/cortes/prompts:/app/prompts:ro
@@ -93,5 +53,4 @@ services:
 
 volumes:
   pgdata:
-  n8n_data:
   whisper_models:

@@ -132,93 +132,14 @@ class Claude:
         )
 
 
-class ClaudeCode:
-    """Claude via CLI do Claude Code em modo headless (`claude -p`), usando a ASSINATURA
-    (token de `claude setup-token` em CLAUDE_CODE_OAUTH_TOKEN). Sem custo por chamada, mas
-    consome os limites do plano. Para produção, use LLM_PROVIDER=anthropic (API)."""
 
-    provider = "claude_code"
-
-    def __init__(self) -> None:
-        import os
-        import shutil
-
-        if not shutil.which("claude"):
-            raise RuntimeError("CLI 'claude' não encontrado na imagem")
-        if not os.environ.get("CLAUDE_CODE_OAUTH_TOKEN"):
-            raise RuntimeError("CLAUDE_CODE_OAUTH_TOKEN não configurado no .env (gere com `claude setup-token`)")
-
-    def structured(self, *, step: str, system: str, user: str, output: type[T], model: str | None = None,
-                   web_search: int = 0, max_tokens: int = 32000, ctx: dict[str, Any] | None = None) -> T:
-        import subprocess
-        import tempfile
-
-        model = model or settings().llm_model
-        ctx = ctx or {}
-        t0 = time.monotonic()
-        data: dict[str, Any] = {}
-        with tempfile.TemporaryDirectory() as tmp:  # cwd vazio: não carrega CLAUDE.md nem configs de projeto
-            sp = f"{tmp}/system.md"
-            with open(sp, "w", encoding="utf-8") as f:
-                f.write(system)
-            tools = "WebSearch" if web_search else ""
-            args = [
-                "claude", "-p",
-                "--system-prompt-file", sp,
-                "--json-schema", json.dumps(strict_schema(output)),
-                "--output-format", "json",
-                "--model", model,
-                "--tools", tools,
-                "--setting-sources", "",
-                "--strict-mcp-config",
-                "--no-session-persistence",
-            ]
-            if web_search:
-                args += ["--allowedTools", "WebSearch"]
-            try:
-                p = subprocess.run(args, input=user, capture_output=True, text=True, cwd=tmp, timeout=900)
-                try:
-                    data = json.loads(p.stdout)
-                except json.JSONDecodeError:
-                    raise RuntimeError(f"claude CLI saiu com {p.returncode}: {(p.stderr or p.stdout)[-2000:]}")
-                if data.get("is_error") or data.get("subtype") != "success":
-                    raise RuntimeError(f"claude CLI erro ({data.get('subtype')}, "
-                                       f"status={data.get('api_error_status')}): {str(data.get('result'))[:1500]}")
-                if data.get("structured_output") is None:
-                    raise RuntimeError(
-                        f"claude CLI não devolveu structured_output (stop={data.get('stop_reason')}, "
-                        f"terminal={data.get('terminal_reason')}, turns={data.get('num_turns')}, "
-                        f"denials={data.get('permission_denials')}): {str(data.get('result'))[:800]}")
-                result = output.model_validate(data["structured_output"])
-            except Exception as e:
-                self._record(step, model, data, t0, ctx, ok=False, error=repr(e)[:2000])
-                raise
-        self._record(step, model, data, t0, ctx, ok=True)
-        return result
-
-    def _record(self, step, model, data, t0, ctx, ok, error=None):
-        u = data.get("usage") or {}
-        stu = u.get("server_tool_use") or {}
-        record_generation(
-            step=step, provider=self.provider, model=model,
-            input_tokens=(u.get("input_tokens") or 0) + (u.get("cache_creation_input_tokens") or 0)
-            + (u.get("cache_read_input_tokens") or 0),
-            output_tokens=u.get("output_tokens"),
-            units=stu.get("web_search_requests") or 0,
-            cost_usd=0,  # coberto pela assinatura
-            meta={"api_equivalent_usd": data.get("total_cost_usd"), "num_turns": data.get("num_turns")},
-            duration_ms=int((time.monotonic() - t0) * 1000), ok=ok, error=error,
-            **{k: ctx[k] for k in ("job_id",) if k in ctx},
-        )
+_llm: Claude | None = None
 
 
-_llm: Claude | ClaudeCode | None = None
-
-
-def llm() -> Claude | ClaudeCode:
+def llm() -> Claude:
     global _llm
     if _llm is None:
-        _llm = {"anthropic": Claude, "claude_code": ClaudeCode}[settings().llm_provider]()
+        _llm = Claude()
     return _llm
 
 

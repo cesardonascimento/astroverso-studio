@@ -5,11 +5,7 @@ Claude escolher o melhor trecho, espera a sua aprovação e monta o corte vertic
 
 ## Como usar
 
-No canal do studio, mande o link, com ou sem um texto do que você quer (ex.: `foca na parte do futebol, máximo
-40s`). O roteiro chega com **Aprovar**, **Refazer roteiro** e **Cancelar**; o vídeo, com **Pedir alteração**. Também
-dá para responder às mensagens com o que mudar.
-
-O vídeo no Discord é uma prévia leve (limite de 10 MB). O arquivo final, em 1080x1920, fica em
+Pelo terminal ou pela API (abaixo). O arquivo final, em 1080x1920, fica em
 `data/cortes/jobs/<corte>/render_v<versão>/final.mp4`.
 
 ## Variáveis do `.env`
@@ -91,9 +87,6 @@ Todas as rotas, menos `/health`, pedem `Authorization: Bearer <WORKER_TOKEN>`. N
 | `GET /jobs/{id}/file` (`?preview=1`) | Vídeo final (ou a prévia) |
 | `POST /jobs/{id}/<ação>` | `approve`, `replan`, `revise`, `rerender`, `retry`, `cancel`; texto em `text` |
 | `GET /presets` | Presets e efeitos disponíveis |
-
-A cada mudança de estado, o módulo manda ao n8n (`/webhook/cortes-events`) o evento com o resumo do corte. Falhas
-nesse aviso nunca param o corte.
 
 ## Pelo terminal
 

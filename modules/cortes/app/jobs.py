@@ -12,7 +12,6 @@ import time
 from psycopg.types.json import Jsonb
 
 from .config import settings, subtitle_style
-from .events import notify
 from .db import tx
 from .pipeline import plan as planner
 from .pipeline import source
@@ -150,7 +149,6 @@ def run_one() -> bool:
         note = f"ok em {time.monotonic() - t0:.1f}s"
         with tx() as conn:
             transition(conn, jid, state, to, note, attempts=0, locked_until=None, last_error=None)
-        notify(jid, state, to, note)
     except Exception as e:  # noqa: BLE001
         log.exception("job %s falhou em %s", jid, state)
         permanent = isinstance(e, StepFailed) or job["attempts"] >= job["max_attempts"]
@@ -162,8 +160,6 @@ def run_one() -> bool:
                 conn.execute("UPDATE jobs SET locked_until=NULL, last_error=%s, updated_at=now(),"
                              " next_run_at = now() + make_interval(mins => %s) WHERE id=%s",
                              (repr(e)[:4000], 4 ** (job["attempts"] - 1), jid))
-        if permanent:
-            notify(jid, state, "FAILED", repr(e)[:500])
     return True
 
 
@@ -172,7 +168,7 @@ RENDER_KEYS = ("layout", "crop_x", "top_box", "bottom_box", "subtitle_preset")
 
 def act(job_id: int, action: str, body: dict) -> dict:
     res = _act(job_id, action, body)
-    notify(job_id, res.pop("_from"), res["state"], f"ação: {action}")
+    res.pop("_from")
     return res
 
 

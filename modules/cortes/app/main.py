@@ -53,7 +53,7 @@ class JobCreate(BaseModel):
     subtitle_preset: str | None = None     # nome em config/presets.json
     instructions: str | None = None # prompt adicional: como você quer o corte/edição
     rights_note: str | None = None  # de onde vem a autorização para cortar
-    context: dict = {}              # origem do pedido (ex.: {"discord": {"channel_id", "message_id", "user"}})
+    context: dict = {}              # origem do pedido
 
 
 @app.post("/jobs", dependencies=[Depends(auth)])
@@ -66,7 +66,6 @@ def job_create(body: JobCreate):
             (body.url, Jsonb(opts), body.rights_note, (body.instructions or "").strip() or None,
              Jsonb(body.context))).fetchone()
         conn.execute("INSERT INTO job_events (job_id, to_state, note) VALUES (%s,'QUEUED','criado')", (j["id"],))
-    jobs.notify(j["id"], None, "QUEUED", "criado")
     return j
 
 

@@ -16,7 +16,6 @@ class Settings(BaseSettings):
     worker_concurrency: int = 1
     content_language: str = "pt-BR"
 
-    llm_provider: str = "claude_code"  # claude_code (assinatura) | anthropic (API)
     anthropic_api_key: str = ""
     llm_model: str = "claude-opus-5-5"
     llm_model_fast: str = "claude-opus-5-5"
@@ -30,9 +29,6 @@ class Settings(BaseSettings):
     cut_max_duration_s: int = 75
     cut_layout: str = "auto"  # auto | crop | fit_blur
     youtube_cookies_file: str = ""  # opcional, se o YouTube pedir login
-
-    # n8n: webhook que recebe os eventos de mudança de estado (vazio = desligado)
-    n8n_events_url: str = ""
 
 
 @lru_cache
