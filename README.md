@@ -83,7 +83,17 @@ Nas máquinas com o app, o `.env` usa as mesmas senhas e aponta para o PC-NAS: `
   de cada chamada à IA.
 - **`migrations/`:** migrações do Alembic, aplicadas sozinhas quando o app sobe. Depois de mudar um model, gere uma
   nova com `alembic revision --autogenerate -m "<o que mudou>"` (dentro da imagem de teste) e revise o arquivo.
-- **`app/lib/`:** integração com o que é de fora e não é IA. `lib/database` abre sessões e aplica as migrações.
+- **`app/lib/`:** integração com o que é de fora e não é IA. Recebe parâmetros e devolve resultados, sem conhecer
+  models nem services. Cada operação é uma classe com `execute`.
+  - **`lib/database`:** abre sessões e aplica as migrações.
+  - **`lib/s3`:** garante o bucket, envia, baixa, lê (com faixa de bytes, para o player) e apaga objetos.
+  - **`lib/youtube`:** baixa o vídeo (até 1080p, preferindo H.264) e as legendas do YouTube com tempo por palavra.
+  - **`lib/ffmpeg`:** mede vídeos, extrai o áudio, monta o corte vertical 1080x1920 (layouts `crop`, `fit_blur`,
+    `split` ou `auto`), queima as legendas ASS palavra por palavra, normaliza o volume e confere a qualidade.
+  - **`lib/media.py`:** `Word` e `Segment`, os tipos que circulam entre `lib/` e `ai/`.
+- **`app/ai/`:** tudo que é IA, com a mesma regra da `lib/`.
+  - **`ai/claude`:** uma chamada que devolve JSON validado por um model Pydantic, com o uso de tokens e o custo.
+  - **`ai/whisper`:** transcrição com tempo por palavra (faster-whisper), na GPU quando houver.
 
 ### Testes
 

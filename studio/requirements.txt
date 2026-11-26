@@ -14,3 +14,4 @@ markdown>=3.11,<4
 anthropic>=2.14,<3
 yt-dlp[default]>=2026.11.23
 faster-whisper>=1.2,<2
+av>=17,<19

@@ -107,3 +107,5 @@ O studio é um projeto próprio, independente do Astroverso, que roda em qualque
   mesmo `.env` servir ao app na rede do compose e às instâncias de fora.
 - `podman-compose up --build` não recria um container que já existe com a mesma configuração: use
   `--force-recreate` para pegar a imagem nova.
+- O faster-whisper 1.2.1 quebra com o PyAV 19 (`metadata_errors`): o `av` fica fixado abaixo da 19 até sair uma
+  versão nova do faster-whisper.
