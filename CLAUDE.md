@@ -101,7 +101,12 @@ antiga (módulo `cortes`, ponte com o Discord, n8n) fica no histórico do git; `
 
 ## Armadilhas
 
-- O CDI da GPU (`nvidia-ctk cdi generate`) precisa ser refeito quando o driver da NVIDIA muda.
+- O CDI da GPU (`nvidia-ctk cdi generate`) precisa ser refeito quando o driver da NVIDIA muda. Sem o CDI, o
+  `compose.gpu.yaml` impede o container de subir; sem ele, o Whisper roda na CPU.
+- As bibliotecas CUDA vêm do pip (`nvidia-cublas-cu12`, `nvidia-cudnn-cu12`) e são achadas pelo `LD_LIBRARY_PATH` do
+  `Containerfile`. Trocar a versão do Python da imagem exige atualizar esse caminho.
+- SELinux: pastas do repositório montadas em containers usam `:z` (compartilhado). `:Z` dá um rótulo exclusivo e tira
+  o acesso dos outros containers que montam a mesma pasta (aconteceu com o banco de teste).
 - Estratégias editadas pelo site gravam em `studio/content/`: a mudança só fica salva de verdade depois do commit. Cada
   instância tem o próprio checkout, então a outra só recebe depois de um pull.
 - O Postgres e o versitygw escutam na mesma porta dentro e fora do container (`DATABASE_PORT`, `S3_PORT`), para o

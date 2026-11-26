@@ -65,6 +65,26 @@ podman-compose --profile storage --profile studio up -d --build
 
 A página fica em `http://<ip>:<STUDIO_PORT>`.
 
+### GPU NVIDIA para o Whisper
+
+A transcrição usa a GPU quando ela está disponível para o container; senão, a CPU. Uma vez por máquina (e de novo
+sempre que o driver da NVIDIA mudar):
+
+```bash
+sudo dnf install nvidia-container-toolkit                   # ou o pacote da sua distribuição
+sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
+podman run --rm --device nvidia.com/gpu=all docker.io/library/ubuntu nvidia-smi   # deve listar a GPU
+```
+
+Depois, suba o app com o arquivo extra da GPU:
+
+```bash
+podman-compose -f compose.yaml -f compose.gpu.yaml --profile storage --profile studio up -d --build
+```
+
+A página **Configurações** mostra se o Whisper está em `CUDA` ou `CPU`. Com 4 GB de VRAM, use `WHISPER_MODEL=medium`
+ou `large-v3` (o tipo automático na GPU é `int8_float16`). Se a GPU falhar no meio, a transcrição continua na CPU.
+
 ### Banco e S3 num PC-NAS
 
 No PC-NAS:
@@ -108,7 +128,9 @@ Nas máquinas com o app, o `.env` usa as mesmas senhas e aponta para o PC-NAS: `
 
 - **`compose.yaml`:** perfil `storage` com `db` (Postgres) e `s3` (versitygw no modo `posix`); perfil `studio` com o
   app.
-- **`studio/`:** o app (FastAPI). `Containerfile` com Python, FFmpeg, a fonte das legendas e o Deno que o yt-dlp usa.
+- **`compose.gpu.yaml`:** acrescenta a GPU (`nvidia.com/gpu=all`, por CDI) ao serviço `studio`.
+- **`studio/`:** o app (FastAPI). `Containerfile` com Python, FFmpeg, a fonte das legendas, o Deno que o yt-dlp usa e
+  as bibliotecas CUDA (cuBLAS e cuDNN) do faster-whisper.
 - **`studio/content/`:** o conteúdo editável, versionado no git:
   - `algorithms/<algoritmo>/*.md`: os prompts de cada algoritmo;
   - `networks/<rede>/network.md`: formato, duração, legenda, hashtags e preset de legenda da rede, mais a orientação
