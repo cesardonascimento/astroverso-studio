@@ -5,8 +5,8 @@ Regras para desenvolver o Astroverso Studio. O contexto da instalação atual (m
 
 ## Situação
 
-O studio é um projeto próprio, independente do Astroverso, que roda em qualquer máquina com GPU. O código em
-`modules/cortes` é a prova de conceito antiga: serve de referência e é removido quando o app novo assumir o corte.
+O studio é um projeto próprio, independente do Astroverso, que roda em qualquer máquina com GPU. A prova de conceito
+antiga (módulo `cortes`, ponte com o Discord, n8n) fica no histórico do git; `archive/tendencias` é só histórico.
 
 ## Arquitetura decidida
 
@@ -42,6 +42,7 @@ O studio é um projeto próprio, independente do Astroverso, que roda em qualque
 | `ai/<ferramenta>/` | Tudo que é IA: Claude, Whisper e o que vier |
 | `lib/<serviço>/` | Integração com tudo que é de fora e não é IA: banco (sessão, engine), S3, YouTube, FFmpeg, WebDAV, TikTok |
 | `content/` | Os `.md` versionados |
+| `dependencies.py` | Monta as peças de `lib/` e `ai/` com as configurações |
 
 ## Regras de código
 

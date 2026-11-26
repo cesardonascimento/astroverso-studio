@@ -9,8 +9,23 @@ estratégia de cada uma; a IA produz o roteiro, você aprova ou edita, e recebe 
   Sobem juntas numa máquina ou separadas, com o banco e o S3 num PC que faz papel de NAS.
 - **Várias instâncias, mesmos dados:** duas ou mais máquinas com o app apontam para o mesmo banco e o mesmo S3. Cada
   uma processa as próprias gerações e todas veem tudo.
+- **Algoritmos, redes e estratégias:** cada pedido usa um algoritmo de geração e uma ou mais redes de destino. Cada
+  rede tem formato, duração e estratégias próprias (viral, emotivo, motivador, informativo...), escritas em `.md`. Na
+  estratégia **Auto**, a IA escolhe a que mais combina com o vídeo. Cada versão do roteiro guarda o texto da
+  estratégia usada.
+- **Fila por instância:** cada etapa é um job com até 3 tentativas (espera de 1, 4 e 16 minutos entre elas). Uma falha
+  definitiva fica registrada no histórico da geração.
 - **Vídeos como arquivos comuns:** o S3 (versitygw) grava cada objeto como arquivo numa pasta do disco, fácil de
   navegar e de copiar para backup.
+
+### Algoritmos
+
+- **Corte de vídeo (`corte`):** recebe o link de um vídeo longo do YouTube e instruções opcionais. Baixa o vídeo,
+  transcreve (legenda automática do YouTube com tempo por palavra; sem legenda, Whisper), e o Claude escolhe de 1 a 4
+  trechos, o texto da tela, a legenda do post e as hashtags, seguindo a rede e a estratégia. As bordas dos trechos são
+  ajustadas às palavras reais. Depois da aprovação, monta o vídeo vertical 1080x1920 com legendas palavra por
+  palavra, volume normalizado (-14 LUFS) e controle de qualidade. Numa revisão, os trechos que não mudaram são
+  copiados da versão anterior, para as bordas não "andarem".
 
 ## Como usar
 
@@ -72,7 +87,13 @@ Nas máquinas com o app, o `.env` usa as mesmas senhas e aponta para o PC-NAS: `
 - **`compose.yaml`:** perfil `storage` com `db` (Postgres) e `s3` (versitygw no modo `posix`); perfil `studio` com o
   app.
 - **`studio/`:** o app (FastAPI). `Containerfile` com Python, FFmpeg, a fonte das legendas e o Deno que o yt-dlp usa.
-- **`modules/cortes`:** prova de conceito antiga, só como referência.
+- **`studio/content/`:** o conteúdo editável, versionado no git:
+  - `algorithms/<algoritmo>/*.md`: os prompts de cada algoritmo;
+  - `networks/<rede>/network.md`: formato, duração, legenda, hashtags e preset de legenda da rede, mais a orientação
+    para a IA no corpo;
+  - `networks/<rede>/strategies/*.md`: uma estratégia por arquivo, com `name` e `description` no cabeçalho e o texto
+    no corpo;
+  - `subtitles/*.md`: um preset de legenda por arquivo (fonte, tamanho, cores, palavras por vez).
 
 ### Camadas do app
 
@@ -91,9 +112,35 @@ Nas máquinas com o app, o `.env` usa as mesmas senhas e aponta para o PC-NAS: `
   - **`lib/ffmpeg`:** mede vídeos, extrai o áudio, monta o corte vertical 1080x1920 (layouts `crop`, `fit_blur`,
     `split` ou `auto`), queima as legendas ASS palavra por palavra, normaliza o volume e confere a qualidade.
   - **`lib/media.py`:** `Word` e `Segment`, os tipos que circulam entre `lib/` e `ai/`.
+  - **`lib/content`:** lê e grava os `.md` com cabeçalho (frontmatter).
 - **`app/ai/`:** tudo que é IA, com a mesma regra da `lib/`.
   - **`ai/claude`:** uma chamada que devolve JSON validado por um model Pydantic, com o uso de tokens e o custo.
   - **`ai/whisper`:** transcrição com tempo por palavra (faster-whisper), na GPU quando houver.
+
+- **`app/dependencies.py`:** monta as peças de `lib/` e `ai/` com as configurações (cliente do S3, Claude, Whisper,
+  YouTube). Nos testes, é aqui que se troca uma peça por uma falsa.
+- **`app/services/<domínio>/`:** as regras do studio, uma classe por feature com um método `execute`.
+  - **`catalog`:** lê redes, estratégias e presets de legenda de `content/`.
+  - **`generations`:** cria uma geração, valida os campos do algoritmo e as estratégias e põe a primeira etapa na fila.
+  - **`jobs`**, **`events`**, **`costs`:** fila, histórico e custo das chamadas à IA.
+- **`app/algorithms/`:** os algoritmos de geração. `base.py` define o contrato: campos do formulário, etapas de
+  preparação (uma vez por geração), a etapa de roteiro e as etapas de render (uma vez por rede). Cada etapa é uma
+  classe com `name`, `label` e `execute(context)`, que devolve a mensagem do histórico; `StepFailed` encerra sem novas
+  tentativas.
+- **`app/worker/`:** reserva o próximo job da instância (`FOR UPDATE SKIP LOCKED`), roda a etapa e decide a próxima:
+  preparação → roteiro de cada rede → aprovação (ou direto, com `auto_approve` e nas revisões) → render → pronto.
+
+### Como criar um algoritmo
+
+1. Criar `app/algorithms/<nome>/` com as etapas e um `Algorithm` em `algorithm.py`.
+2. Registrar em `app/algorithms/__init__.py`.
+3. Colocar os prompts em `content/algorithms/<nome>/`.
+4. Descrever o algoritmo na seção **Algoritmos** deste README.
+
+### Como criar uma rede ou uma estratégia
+
+- **Rede:** uma pasta `content/networks/<rede>/` com `network.md` e pelo menos uma estratégia.
+- **Estratégia:** um `.md` em `content/networks/<rede>/strategies/`. Ela aparece no formulário e no modo Auto.
 
 ### Testes
 
