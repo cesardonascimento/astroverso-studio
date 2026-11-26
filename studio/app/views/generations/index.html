@@ -4,7 +4,16 @@
 {% block heading %}Gerações{% endblock %}
 {% block actions %}<a class="btn btn-primary" href="/generations/new">{{ icon("plus", "icon me-1") }}Nova geração</a>{% endblock %}
 {% block content %}
-{% if not generations %}
+{% set filters = [("", "Todas"), ("active", "Em andamento"), ("approval", "Aguardando aprovação"), ("done", "Prontas"), ("failed", "Com falha")] %}
+<div class="d-flex flex-wrap gap-2 mb-3">
+  {% for value, label in filters %}
+  <a class="btn btn-sm {% if state == value %}btn-primary{% else %}btn-ghost-secondary{% endif %}" href="?state={{ value }}{% if instance %}&instance={{ instance }}{% endif %}">{{ label }}</a>
+  {% endfor %}
+  {% if instance %}<a class="btn btn-sm btn-ghost-secondary ms-auto" href="?state={{ state }}">instância {{ instance }} ✕</a>{% endif %}
+</div>
+{% if not generations and (state or instance) %}
+<div class="empty"><p class="empty-title">Nada por aqui com esse filtro</p></div>
+{% elif not generations %}
 <div class="empty">
   <p class="empty-title">Nenhuma geração ainda</p>
   <p class="empty-subtitle text-secondary">Comece mandando o link de um vídeo.</p>
@@ -14,7 +23,7 @@
 <div class="card">
   <div class="table-responsive">
     <table class="table table-vcenter card-table">
-      <thead><tr><th>#</th><th>Vídeo</th><th>Saídas</th><th>Instância</th><th>Criada</th></tr></thead>
+      <thead><tr><th>#</th><th>Vídeo</th><th>Saídas</th><th>Instância</th><th>Custo</th><th>Criada</th></tr></thead>
       <tbody>
       {% for generation in generations %}
         <tr>
@@ -23,10 +32,11 @@
           <td>
             {% if generation.state in ("PREPARING", "FAILED", "CANCELLED") %}{{ state_badge(generation.state) }}{% endif %}
             {% if generation.state not in ("FAILED", "CANCELLED") %}
-              {% for output in generation.outputs %}<span class="me-1">{{ state_badge(output.state) }}</span>{% endfor %}
+              {% for output in generation.outputs %}<span class="me-1 text-nowrap"><span class="text-secondary small">{{ output.network }}</span> {{ state_badge(output.state) }}</span>{% endfor %}
             {% endif %}
           </td>
-          <td><span class="badge bg-secondary-lt">{{ generation.instance }}</span></td>
+          <td><a class="badge bg-secondary-lt" href="?instance={{ generation.instance }}">{{ generation.instance }}</a></td>
+          <td class="text-secondary">{% if generation.cost_usd %}US$ {{ "%.3f" | format(generation.cost_usd) }}{% endif %}</td>
           <td class="text-secondary">{{ generation.created_at | local_time }}</td>
         </tr>
       {% endfor %}

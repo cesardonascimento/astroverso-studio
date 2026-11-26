@@ -1,1 +1,70 @@
-{% with plan = version.plan, editable = False %}<div class="mt-3">{% include algorithm.plan_template %}</div>{% endwith %}
+{% from "macros.html" import icon %}
+<div class="row g-3 mt-1">
+  <div class="col-md-5 text-center">
+    <video class="vertical w-100 rounded" controls preload="metadata" src="/outputs/{{ output.id }}/videos/{{ version.version }}"></video>
+    <div class="d-flex gap-2 justify-content-center mt-2">
+      <a class="btn btn-primary" href="/outputs/{{ output.id }}/videos/{{ version.version }}?download=1">{{ icon("download", "icon me-1") }}Baixar</a>
+    </div>
+    <div class="text-secondary small mt-2">{{ (version.duration_s or 0) | float | round | int }} s · {{ version.render_report.get("layout") }} · legenda {{ version.render_report.get("subtitle_preset") }}</div>
+    {% set warnings = (version.render_report.get("quality") or {}).get("checks", []) | rejectattr("ok") | list %}
+    {% if warnings %}<div class="text-warning small mt-1">{{ icon("alert-triangle", "icon me-1") }}{% for check in warnings %}{{ check.name }} ({{ check.detail }}){% if not loop.last %}, {% endif %}{% endfor %}</div>{% endif %}
+  </div>
+  <div class="col-md-7">
+    <div class="mb-3">
+      <div class="text-secondary small">Legenda do post</div>
+      <div>{{ version.plan.caption }}</div>
+      <div class="text-secondary">{% for tag in version.plan.hashtags %}#{{ tag.lstrip('#') }} {% endfor %}</div>
+    </div>
+
+    <form method="post" action="/outputs/{{ output.id }}/revise" class="mb-3">
+      <label class="form-label">{{ icon("pencil", "icon me-1") }}Pedir alteração</label>
+      <textarea class="form-control mb-2" name="text" rows="2" placeholder="Ex.: começa uma frase antes, troca o texto do topo, legenda maior"></textarea>
+      <button class="btn btn-sm">Enviar alteração</button>
+      <span class="form-hint d-inline ms-2">Muda só o que você pedir e renderiza direto.</span>
+    </form>
+
+    <details class="mb-3">
+      <summary class="text-secondary">{{ icon("refresh", "icon me-1") }}Renderizar de novo com outro visual</summary>
+      <form method="post" action="/outputs/{{ output.id }}/rerender" class="row g-2 mt-1">
+        <div class="col-sm-6">
+          <select class="form-select" name="layout">
+            <option value="auto">Automático</option>
+            <option value="crop" {% if version.render_report.get("layout") == "crop" %}selected{% endif %}>Tela cheia</option>
+            <option value="fit_blur" {% if version.render_report.get("layout") == "fit_blur" %}selected{% endif %}>Vídeo inteiro</option>
+          </select>
+        </div>
+        <div class="col-sm-6">
+          <select class="form-select" name="subtitle_preset">
+            {% for preset in presets %}<option value="{{ preset.name }}" {% if preset.name == version.render_report.get("subtitle_preset") %}selected{% endif %}>{{ preset.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-12"><button class="btn btn-sm">Renderizar</button></div>
+      </form>
+    </details>
+
+    <details class="mb-3">
+      <summary class="text-secondary">{{ icon("file-text", "icon me-1") }}Roteiro desta versão</summary>
+      <div class="mt-2">{% with plan = version.plan, editable = False %}{% include algorithm.plan_template %}{% endwith %}</div>
+    </details>
+
+    {% set rendered = output.versions | selectattr("video_key") | list %}
+    {% if rendered | length > 1 %}
+    <details>
+      <summary class="text-secondary">{{ icon("list", "icon me-1") }}Versões anteriores</summary>
+      <div class="list-group list-group-flush mt-2">
+        {% for item in rendered | reverse %}{% if item.version != version.version %}
+        <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+          <div><strong>v{{ item.version }}</strong> <span class="text-secondary small">{{ item.kind }}{% if item.request %} · {{ item.request }}{% endif %}</span></div>
+          <div class="d-flex gap-1">
+            <a class="btn btn-sm btn-ghost-secondary" href="/outputs/{{ output.id }}/videos/{{ item.version }}" target="_blank">{{ icon("player-play") }}</a>
+            <a class="btn btn-sm btn-ghost-secondary" href="/outputs/{{ output.id }}/videos/{{ item.version }}?download=1">{{ icon("download") }}</a>
+          </div>
+        </div>
+        {% endif %}{% endfor %}
+      </div>
+    </details>
+    {% endif %}
+
+    <button type="button" class="btn btn-ghost-secondary btn-sm mt-3" data-bs-toggle="collapse" data-bs-target="#replan-{{ output.id }}">{{ icon("sparkles", "icon me-1") }}Pedir um roteiro totalmente novo</button>
+  </div>
+</div>

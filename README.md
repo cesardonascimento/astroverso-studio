@@ -24,6 +24,12 @@ estratégia de cada uma; a IA produz o roteiro, você aprova ou edita, e recebe 
   andamento) e o histórico. O roteiro de cada rede pode ser editado antes de aprovar: título, texto da tela, legenda,
   hashtags e o início e o fim de cada trecho (ajustados às palavras). Também dá para pedir outro roteiro com
   instruções, cancelar e tentar de novo uma etapa que falhou.
+- **Resultado:** player (lê do S3 pelo app, com avanço no vídeo), download com o nome `yyyyMMddHHmm - título.mp4`,
+  versões anteriores, pedido de alteração (muda só o que foi pedido e renderiza direto) e render de novo com outro
+  enquadramento ou legenda, sem chamar a IA.
+- **Apagar o original:** libera o espaço do vídeo baixado do YouTube. Os cortes prontos ficam; novos roteiros e renders
+  daquela geração deixam de ser possíveis.
+- **Listagem:** todas as gerações de todas as instâncias, com filtros por situação e por instância e o custo da IA.
 - **Página com login:** uma senha só (`STUDIO_PASSWORD`), cookie assinado por 30 dias. Tema claro e escuro.
 
 ### Algoritmos
@@ -136,9 +142,9 @@ Nas máquinas com o app, o `.env` usa as mesmas senhas e aponta para o PC-NAS: `
 - **`app/services/<domínio>/`:** as regras do studio, uma classe por feature com um método `execute`.
   - **`catalog`:** lê redes, estratégias e presets de legenda de `content/`.
   - **`generations`:** cria uma geração (valida os campos do algoritmo e as estratégias e põe a primeira etapa na fila),
-    transforma o formulário em destinos (`BuildTargets`) e lista as gerações.
-  - **`outputs`:** aprovar (com edição, que vira uma nova versão), pedir outro roteiro ou uma alteração, cancelar e
-    tentar de novo.
+    transforma o formulário em destinos (`BuildTargets`), lista com filtros e apaga o original.
+  - **`outputs`:** aprovar (com edição, que vira uma nova versão), pedir outro roteiro ou uma alteração, renderizar de
+    novo, cancelar, tentar de novo, abrir o vídeo e montar o nome do arquivo.
   - **`jobs`**, **`events`**, **`costs`:** fila, histórico e custo das chamadas à IA.
 - **`app/algorithms/`:** os algoritmos de geração. `base.py` define o contrato: campos do formulário, etapas de
   preparação (uma vez por geração), a etapa de roteiro, as etapas de render (uma vez por rede), o template que mostra

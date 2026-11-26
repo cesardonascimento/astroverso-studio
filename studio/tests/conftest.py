@@ -48,3 +48,13 @@ def client(session, monkeypatch):
     test_client.post("/login", data={"password": settings().studio_password})
     yield test_client
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def test_bucket(monkeypatch):
+    from app.dependencies import storage_client
+    from app.lib.s3 import EnsureBucket
+
+    monkeypatch.setattr(settings(), "s3_bucket", f"{settings().s3_bucket}-test")
+    EnsureBucket(storage_client()).execute(settings().s3_bucket)
+    return settings().s3_bucket

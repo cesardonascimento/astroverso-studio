@@ -13,6 +13,7 @@ class VersionKind:
     REPLAN = "replan"
     REVISION = "revision"
     EDIT = "edit"
+    RERENDER = "rerender"
 
 
 class OutputVersion(Base):

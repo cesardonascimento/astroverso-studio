@@ -7,6 +7,11 @@
 <div class="d-flex gap-2 align-items-center">
   {% if generation.cost_usd %}<span class="badge bg-secondary-lt" title="Custo da IA">US$ {{ "%.3f" | format(generation.cost_usd) }}</span>{% endif %}
   {% if generation.inputs.get("url") %}<a class="btn btn-ghost-secondary" href="{{ generation.inputs.url }}" target="_blank" rel="noopener">Vídeo original</a>{% endif %}
+  {% if generation.original_key and generation.state != "PREPARING" %}
+  <form method="post" action="/generations/{{ generation.id }}/delete-original" onsubmit="return confirm('Apagar o vídeo original? Os cortes prontos continuam, mas novos roteiros e renders deixam de ser possíveis.')">
+    <button class="btn btn-ghost-secondary" title="Libera espaço no armazenamento">{{ icon("trash", "icon me-1") }}Apagar original</button>
+  </form>
+  {% elif generation.original_deleted_at %}<span class="badge bg-secondary-lt">original apagado</span>{% endif %}
   {% if generation.state == "PREPARING" or generation.outputs | selectattr("state", "in", ["WAITING", "PLANNING", "AWAITING_APPROVAL", "RENDERING"]) | list %}
   <form method="post" action="/generations/{{ generation.id }}/cancel" onsubmit="return confirm('Cancelar esta geração?')">
     <button class="btn btn-ghost-danger">{{ icon("x", "icon me-1") }}Cancelar</button>
