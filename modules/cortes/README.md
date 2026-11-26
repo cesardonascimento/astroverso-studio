@@ -1,5 +1,8 @@
 # cortes
 
+> Código de referência da prova de conceito. Não sobe mais pelo `compose.yaml` e será removido quando o app em
+> `studio/` assumir o corte.
+
 Módulo de cortes de vídeos longos para o TikTok. Recebe o link de um vídeo do YouTube, usa a transcrição para o
 Claude escolher o melhor trecho, espera a sua aprovação e monta o corte vertical com legendas palavra por palavra.
 
@@ -92,7 +95,6 @@ Todas as rotas, menos `/health`, pedem `Authorization: Bearer <WORKER_TOKEN>`. N
 
 ```bash
 sh modules/cortes/scripts/cut.sh "<link>" auto     # corte direto, sem aprovação
-sh modules/cortes/scripts/wait-job.sh <corte>      # espera terminar e mostra as etapas
 sh modules/cortes/scripts/api.sh GET /jobs/<corte>/preview
 ```
 

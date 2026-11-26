@@ -1,56 +1,34 @@
-# Astroverso Studio
-# Base compartilhada (postgres) + um serviço por módulo (modules/<módulo>).
-# Rodar no Linux/WSL:  podman-compose up -d --build
-
 name: astroverso-studio
 
 services:
-  postgres:
+  db:
+    profiles: [storage]
     image: docker.io/library/postgres:17-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      # um banco por módulo, criados na primeira inicialização (db/init)
-      STUDIO_DATABASES: cortes
+      POSTGRES_DB: ${DATABASE_NAME}
+      POSTGRES_USER: ${DATABASE_USER}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+      TZ: ${TZ}
     volumes:
-      - pgdata:/var/lib/postgresql/data
-      - ./db/init:/docker-entrypoint-initdb.d:ro
+      - ${DATABASE_DATA_DIR}:/var/lib/postgresql/data:Z
     ports:
-      - "127.0.0.1:5433:5432"
+      - "${STORAGE_BIND_ADDRESS}:${DATABASE_PORT}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER} -d ${DATABASE_NAME}"]
       interval: 10s
       timeout: 5s
       retries: 10
 
-  # ---------------------------------------------------------------- módulos
-  cortes:
-    build: ./modules/cortes
+  s3:
+    profiles: [storage]
+    image: docker.io/versity/versitygw:v1.11.0
     restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-    env_file: .env
+    command: ["--port", ":7070", "posix", "/data"]
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/cortes
-      MEDIA_DIR: /data/media
-      PROMPTS_DIR: /app/prompts
+      ROOT_ACCESS_KEY: ${S3_ACCESS_KEY}
+      ROOT_SECRET_KEY: ${S3_SECRET_KEY}
     volumes:
-      - ./data/cortes:/data/media
-      - ./modules/cortes/prompts:/app/prompts:ro
-      - ./modules/cortes/config:/app/config:ro
-      - ./modules/cortes/app:/app/app:ro
-      - ./modules/cortes/migrations:/app/migrations:ro
-      - whisper_models:/root/.cache/huggingface
+      - ${S3_DATA_DIR}:/data:Z
     ports:
-      - "127.0.0.1:8091:8080"
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8080/health').status==200 else 1)"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-
-volumes:
-  pgdata:
-  whisper_models:
+      - "${STORAGE_BIND_ADDRESS}:${S3_PORT}:7070"
