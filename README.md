@@ -23,8 +23,10 @@ Linux com Podman e `podman-compose`.
 ```bash
 cp .env.example .env                       # troque todos os toBeModified
 mkdir -p data/db data/s3 data/work
-podman-compose --profile storage up -d
+podman-compose --profile storage --profile studio up -d --build
 ```
+
+A página fica em `http://<ip>:<STUDIO_PORT>`.
 
 ### Banco e S3 num PC-NAS
 
@@ -67,5 +69,21 @@ Nas máquinas com o app, o `.env` usa as mesmas senhas e aponta para o PC-NAS: `
 
 ### Peças
 
-- **`compose.yaml`:** perfil `storage` com `db` (Postgres) e `s3` (versitygw no modo `posix`).
+- **`compose.yaml`:** perfil `storage` com `db` (Postgres) e `s3` (versitygw no modo `posix`); perfil `studio` com o
+  app.
+- **`studio/`:** o app (FastAPI). `Containerfile` com Python, FFmpeg, a fonte das legendas e o Deno que o yt-dlp usa.
 - **`modules/cortes`:** prova de conceito antiga, só como referência.
+
+### Camadas do app
+
+- **`app/config.py`:** o único lugar que lê variáveis de ambiente. Toda variável nova entra também no `.env.example`.
+
+### Testes
+
+```bash
+cd studio && podman build --target test -t studio-test .
+cd .. && podman run --rm -v .:/repo:Z -w /repo/studio studio-test python -m pytest
+```
+
+Os testes conferem, entre outras coisas, que o `.env.example` lista todas as variáveis usadas pelo app e pelo
+`compose.yaml`.
