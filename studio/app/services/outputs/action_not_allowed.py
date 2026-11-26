@@ -1,0 +1,2 @@
+class ActionNotAllowed(ValueError):
+    pass

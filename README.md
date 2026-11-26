@@ -20,6 +20,10 @@ estratégia de cada uma; a IA produz o roteiro, você aprova ou edita, e recebe 
 
 - **Nova geração em três passos:** escolha o algoritmo, preencha o pedido (os campos vêm do algoritmo) e marque as
   redes, com estratégia, enquadramento, legenda e a opção de renderizar sem esperar a aprovação.
+- **Acompanhar e aprovar:** a página da geração mostra as etapas ao vivo (atualiza sozinha enquanto há algo em
+  andamento) e o histórico. O roteiro de cada rede pode ser editado antes de aprovar: título, texto da tela, legenda,
+  hashtags e o início e o fim de cada trecho (ajustados às palavras). Também dá para pedir outro roteiro com
+  instruções, cancelar e tentar de novo uma etapa que falhou.
 - **Página com login:** uma senha só (`STUDIO_PASSWORD`), cookie assinado por 30 dias. Tema claro e escuro.
 
 ### Algoritmos
@@ -133,9 +137,12 @@ Nas máquinas com o app, o `.env` usa as mesmas senhas e aponta para o PC-NAS: `
   - **`catalog`:** lê redes, estratégias e presets de legenda de `content/`.
   - **`generations`:** cria uma geração (valida os campos do algoritmo e as estratégias e põe a primeira etapa na fila),
     transforma o formulário em destinos (`BuildTargets`) e lista as gerações.
+  - **`outputs`:** aprovar (com edição, que vira uma nova versão), pedir outro roteiro ou uma alteração, cancelar e
+    tentar de novo.
   - **`jobs`**, **`events`**, **`costs`:** fila, histórico e custo das chamadas à IA.
 - **`app/algorithms/`:** os algoritmos de geração. `base.py` define o contrato: campos do formulário, etapas de
-  preparação (uma vez por geração), a etapa de roteiro e as etapas de render (uma vez por rede). Cada etapa é uma
+  preparação (uma vez por geração), a etapa de roteiro, as etapas de render (uma vez por rede), o template que mostra
+  o roteiro (`views/algorithms/<nome>/plan.html`) e o editor que aplica as edições da página. Cada etapa é uma
   classe com `name`, `label` e `execute(context)`, que devolve a mensagem do histórico; `StepFailed` encerra sem novas
   tentativas.
 - **`app/worker/`:** reserva o próximo job da instância (`FOR UPDATE SKIP LOCKED`), roda a etapa e decide a próxima:
@@ -143,7 +150,8 @@ Nas máquinas com o app, o `.env` usa as mesmas senhas e aponta para o PC-NAS: `
 
 ### Como criar um algoritmo
 
-1. Criar `app/algorithms/<nome>/` com as etapas e um `Algorithm` em `algorithm.py`.
+1. Criar `app/algorithms/<nome>/` com as etapas, o editor do roteiro e um `Algorithm` em `algorithm.py`, e o
+   template `app/views/algorithms/<nome>/plan.html`.
 2. Registrar em `app/algorithms/__init__.py`.
 3. Colocar os prompts em `content/algorithms/<nome>/`.
 4. Descrever o algoritmo na seção **Algoritmos** deste README.

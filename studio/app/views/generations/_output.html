@@ -1,0 +1,55 @@
+{% from "macros.html" import icon, state_badge %}
+{% from "macros_progress.html" import steps %}
+{% set busy = output.state in ("WAITING", "PLANNING", "RENDERING") %}
+{% set version = output.versions[-1] if output.versions else None %}
+<div class="card mb-3" id="output-{{ output.id }}"
+     {% if busy %}hx-get="/outputs/{{ output.id }}/card" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
+  <div class="card-header">
+    <div>
+      <h3 class="card-title">{{ output.network | capitalize }}</h3>
+      <div class="text-secondary small">
+        estratégia {{ version.strategy_name if version else output.strategy }}{% if output.strategy == "auto" %} (auto){% endif %}
+        {% if version %}· roteiro v{{ version.version }}{% endif %}
+      </div>
+    </div>
+    <div class="card-actions">{{ state_badge(output.state) }}</div>
+  </div>
+  <div class="card-body">
+    {{ steps(progress.execute(generation, output)) }}
+
+    {% if output.state == "FAILED" %}
+    <div class="alert alert-danger mt-3">
+      <div class="mb-2">{{ output.last_error }}</div>
+      <form method="post" action="/outputs/{{ output.id }}/retry" class="d-inline"><button class="btn btn-danger btn-sm">{{ icon("refresh", "icon me-1") }}Tentar de novo</button></form>
+    </div>
+    {% endif %}
+
+    {% if output.state == "AWAITING_APPROVAL" and version %}
+    <form method="post" action="/outputs/{{ output.id }}/approve" class="mt-3">
+      {% with plan = version.plan, editable = True %}{% include algorithm.plan_template %}{% endwith %}
+      <div class="d-flex flex-wrap gap-2 mt-3">
+        <button class="btn btn-primary">{{ icon("check", "icon me-1") }}Aprovar e renderizar</button>
+        <button type="button" class="btn" data-bs-toggle="collapse" data-bs-target="#replan-{{ output.id }}">{{ icon("refresh", "icon me-1") }}Pedir outro roteiro</button>
+        <button type="submit" form="cancel-{{ output.id }}" class="btn btn-ghost-danger ms-auto">{{ icon("x", "icon me-1") }}Cancelar</button>
+      </div>
+    </form>
+    <form id="cancel-{{ output.id }}" method="post" action="/outputs/{{ output.id }}/cancel" onsubmit="return confirm('Cancelar esta saída?')"></form>
+    {% endif %}
+
+    {% if output.state in ("AWAITING_APPROVAL", "DONE", "FAILED") and version %}
+    <form method="post" action="/outputs/{{ output.id }}/replan" class="collapse mt-3" id="replan-{{ output.id }}">
+      <label class="form-label">O que mudar no novo roteiro?</label>
+      <textarea class="form-control mb-2" name="text" rows="2" placeholder="Ex.: pega a parte sobre a infância, mais curto"></textarea>
+      <button class="btn btn-primary btn-sm">{{ icon("sparkles", "icon me-1") }}Gerar novo roteiro</button>
+    </form>
+    {% endif %}
+
+    {% if output.state == "DONE" and version %}
+      {% include "generations/_result.html" %}
+    {% endif %}
+
+    {% if busy and version and output.state == "RENDERING" %}
+      <div class="mt-3">{% with plan = version.plan, editable = False %}{% include algorithm.plan_template %}{% endwith %}</div>
+    {% endif %}
+  </div>
+</div>

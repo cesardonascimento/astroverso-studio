@@ -1,0 +1,15 @@
+{% set busy = generation.state == "PREPARING" or generation.outputs | selectattr("state", "in", ["WAITING", "PLANNING", "RENDERING"]) | list %}
+<div class="card" id="events" {% if busy %}hx-get="/generations/{{ generation.id }}/events" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
+  <div class="card-header"><h3 class="card-title">Histórico</h3></div>
+  <div class="list-group list-group-flush overflow-auto" style="max-height: 70vh">
+    {% for event in generation.events | reverse %}
+    <div class="list-group-item">
+      <div class="d-flex justify-content-between">
+        <strong class="{% if not event.ok %}text-danger{% endif %}">{{ event.step }}</strong>
+        <span class="text-secondary small">{{ event.created_at | local_time("%H:%M:%S") }}</span>
+      </div>
+      <div class="text-secondary small text-break">{{ event.message }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>

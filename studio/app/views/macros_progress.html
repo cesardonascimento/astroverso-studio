@@ -1,0 +1,9 @@
+{% macro steps(items) -%}
+<ul class="steps steps-counter my-2">
+  {% for item in items %}
+  <li class="step-item {% if item.status == 'active' %}active{% endif %} {% if item.status == 'failed' %}text-danger{% endif %}">
+    {{ item.label }}{% if item.status == 'active' %} <span class="spinner-border spinner-border-sm ms-1"></span>{% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{%- endmacro %}

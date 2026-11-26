@@ -60,7 +60,11 @@
       </div>
     </div>
     <div class="page-body">
-      <div class="container-xl">{% block content %}{% endblock %}</div>
+      <div class="container-xl">
+        {% set flash = pop_flash(request) %}
+        {% if flash %}<div class="alert alert-{{ flash.kind }} alert-dismissible" role="alert">{{ flash.message }}<a class="btn-close" data-bs-dismiss="alert"></a></div>{% endif %}
+        {% block content %}{% endblock %}
+      </div>
     </div>
   </div>
 </div>

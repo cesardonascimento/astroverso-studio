@@ -1,0 +1,18 @@
+{% from "macros.html" import icon, state_badge %}
+{% from "macros_progress.html" import steps %}
+<div class="card mb-3" id="preparation"
+     {% if generation.state == "PREPARING" %}hx-get="/generations/{{ generation.id }}/preparation" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
+  <div class="card-header">
+    <h3 class="card-title">Preparação</h3>
+    <div class="card-actions">{{ state_badge(generation.state) }}</div>
+  </div>
+  <div class="card-body">
+    {{ steps(progress.execute(generation)) }}
+    {% if generation.state == "FAILED" %}
+    <div class="alert alert-danger mt-3 mb-0">
+      <div class="mb-2">{{ generation.last_error }}</div>
+      <form method="post" action="/generations/{{ generation.id }}/retry"><button class="btn btn-danger btn-sm">{{ icon("refresh", "icon me-1") }}Tentar de novo</button></form>
+    </div>
+    {% endif %}
+  </div>
+</div>

@@ -35,6 +35,11 @@ class Step:
         raise NotImplementedError
 
 
+class PlanEditor:
+    def execute(self, generation: Generation, plan: dict, form: dict[str, list[str]], workspace: Path) -> dict:
+        raise NotImplementedError
+
+
 @dataclass
 class Algorithm:
     id: str
@@ -44,6 +49,8 @@ class Algorithm:
     preparation: list[type[Step]]
     planning: type[Step]
     rendering: list[type[Step]] = field(default_factory=list)
+    plan_template: str = ""
+    plan_editor: type[PlanEditor] | None = None
 
     def step_named(self, name: str) -> type[Step]:
         for step in [*self.preparation, self.planning, *self.rendering]:

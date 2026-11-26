@@ -1,4 +1,5 @@
 from app.algorithms.base import Algorithm, InputField
+from app.algorithms.corte.apply_plan_edits import ApplyCutPlanEdits
 from app.algorithms.corte.steps.check_cut import CheckCut
 from app.algorithms.corte.steps.download_source import DownloadSource
 from app.algorithms.corte.steps.plan_cut import PlanCut
@@ -16,4 +17,6 @@ CORTE = Algorithm(
     preparation=[DownloadSource, TranscribeSource],
     planning=PlanCut,
     rendering=[RenderCut, CheckCut],
+    plan_template="algorithms/corte/plan.html",
+    plan_editor=ApplyCutPlanEdits,
 )

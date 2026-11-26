@@ -1,0 +1,30 @@
+{% extends "layout.html" %}
+{% from "macros.html" import icon, state_badge %}
+{% block title %}{{ generation.title or "Geração #" ~ generation.id }}{% endblock %}
+{% block pretitle %}<div class="page-pretitle">{{ algorithm.name }} · #{{ generation.id }} · {{ generation.instance }} · {{ generation.created_at | local_time }}</div>{% endblock %}
+{% block heading %}{{ generation.title or generation.inputs.get("url") }}{% endblock %}
+{% block actions %}
+<div class="d-flex gap-2 align-items-center">
+  {% if generation.cost_usd %}<span class="badge bg-secondary-lt" title="Custo da IA">US$ {{ "%.3f" | format(generation.cost_usd) }}</span>{% endif %}
+  {% if generation.inputs.get("url") %}<a class="btn btn-ghost-secondary" href="{{ generation.inputs.url }}" target="_blank" rel="noopener">Vídeo original</a>{% endif %}
+  {% if generation.state == "PREPARING" or generation.outputs | selectattr("state", "in", ["WAITING", "PLANNING", "AWAITING_APPROVAL", "RENDERING"]) | list %}
+  <form method="post" action="/generations/{{ generation.id }}/cancel" onsubmit="return confirm('Cancelar esta geração?')">
+    <button class="btn btn-ghost-danger">{{ icon("x", "icon me-1") }}Cancelar</button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}
+{% block content %}
+<div class="row row-cards">
+  <div class="col-lg-8">
+    {% if generation.inputs.get("instructions") %}
+    <div class="card mb-3"><div class="card-body"><div class="text-secondary small mb-1">Instruções</div>{{ generation.inputs.instructions }}</div></div>
+    {% endif %}
+    {% include "generations/_preparation.html" %}
+    {% if generation.state not in ("PREPARING", "FAILED", "CANCELLED") %}
+      {% for output in generation.outputs %}{% include "generations/_output.html" %}{% endfor %}
+    {% endif %}
+  </div>
+  <div class="col-lg-4">{% include "generations/_events.html" %}</div>
+</div>
+{% endblock %}
